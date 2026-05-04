@@ -1,0 +1,221 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../extension/src/fulltext/pdfText", () => ({
+  extractPdfText: vi.fn(async () => "党建引领基层治理的实践路径研究 张三 这是一段 PDF 全文。")
+}));
+
+import { App } from "../../extension/src/popup/App";
+
+const listOnlyRecord = {
+  id: "P0001",
+  title: "党建引领基层治理的实践路径研究",
+  authors: ["张三"],
+  source: "测试期刊",
+  publishedAt: "2026-04-30",
+  database: "期刊",
+  citations: null,
+  downloads: null,
+  detailUrl: "https://kns.cnki.net/kcms2/article/abstract?v=test",
+  abstract: "",
+  keywords: [],
+  funding: "",
+  album: "",
+  topic: "",
+  classification: "",
+  collectedAt: "2026-05-04T00:00:00.000Z",
+  status: "list-only"
+};
+
+describe("popup", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("显示采集数量并触发导出动作", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [{ id: "P0001", status: "complete" }],
+            failures: []
+          }
+        });
+      }
+      if (message.type === "EXPORT_PACKAGE") {
+        callback({ ok: true, count: 1 });
+      }
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("1 篇")).toHaveLength(2);
+    });
+    fireEvent.click(screen.getByText("导出 AI 分析包"));
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith({ type: "EXPORT_PACKAGE" }, expect.any(Function));
+    });
+    expect(await screen.findByText("已导出 1 篇")).toBeTruthy();
+  });
+
+  it("点击采集并补全后保存完整记录", async () => {
+    const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_RECORDS") {
+        callback({
+          ok: true,
+          count: 1,
+          project: {
+            records: message.records,
+            failures: []
+          }
+        });
+      }
+    });
+    const query = vi.fn((_options, callback) => callback([{ id: 7 }]));
+    const create = vi.fn((_options, callback) => callback({ id: 88 }));
+    const remove = vi.fn((_tabId, callback) => callback?.());
+    const addListener = vi.fn((listener) => listener(88, { status: "complete" }, { id: 88 }));
+    const removeListener = vi.fn();
+    const executeScript = vi.fn()
+      .mockResolvedValueOnce([
+        {
+          result: {
+            records: [listOnlyRecord],
+            diagnostics: {
+              url: "https://kns.cnki.net/",
+              title: "知网检索页",
+              tables: 1,
+              resultTables: 1,
+              titleLinks: 1,
+              textSample: "论文列表"
+            }
+          }
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          result: {
+            detail: {
+              title: "党建引领基层治理的实践路径研究",
+              authors: ["张三"],
+              abstract: "这是一段详情页摘要。",
+              keywords: ["基层治理", "党建引领"],
+              funding: "测试基金",
+              album: "社会科学Ⅰ辑",
+              topic: "中国共产党",
+              classification: "D267"
+            },
+            diagnostics: { title: "详情页", abstractLength: 10, keywordCount: 2 }
+          }
+        }
+      ]);
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query,
+        sendMessage: vi.fn(),
+        create,
+        remove,
+        onUpdated: { addListener, removeListener }
+      },
+      scripting: { executeScript }
+    });
+
+    render(<App />);
+
+    await screen.findByText("采集当前页并补全摘要");
+    fireEvent.click(screen.getByText("采集当前页并补全摘要"));
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        {
+          type: "SAVE_RECORDS",
+          records: [expect.objectContaining({
+            id: "P0001",
+            abstract: "这是一段详情页摘要。",
+            keywords: ["基层治理", "党建引领"],
+            status: "complete"
+          })]
+        },
+        expect.any(Function)
+      );
+    });
+    expect(await screen.findByText("已采集 1 篇，已补全 1 篇，失败 0 篇")).toBeTruthy();
+  });
+
+  it("导入 PDF 全文后保存匹配记录", async () => {
+    const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [listOnlyRecord],
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_RECORDS") {
+        callback({
+          ok: true,
+          count: 1,
+          project: {
+            records: message.records,
+            failures: []
+          }
+        });
+      }
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByText("导入全文 PDF"));
+    const input = document.querySelector("input[type='file']") as HTMLInputElement;
+    const file = new File(["fake"], "党建引领基层治理的实践路径研究.pdf", { type: "application/pdf" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        {
+          type: "SAVE_RECORDS",
+          records: [expect.objectContaining({
+            id: "P0001",
+            fullText: "党建引领基层治理的实践路径研究 张三 这是一段 PDF 全文。",
+            fullTextFileName: "党建引领基层治理的实践路径研究.pdf",
+            fullTextStatus: "matched"
+          })]
+        },
+        expect.any(Function)
+      );
+    });
+    expect(await screen.findByText("已读取 1 个 PDF，匹配 1 篇，未匹配 0 个，失败 0 个")).toBeTruthy();
+  });
+});

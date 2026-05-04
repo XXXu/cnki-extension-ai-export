@@ -1,0 +1,77 @@
+:root {
+  color: #20242a;
+  background: #f6f7f9;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 380px;
+}
+
+.popup-shell {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+p {
+  margin: 6px 0 0;
+  color: #596273;
+  line-height: 1.5;
+}
+
+.status-panel,
+.stats-grid > div {
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.status-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stats-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.stats-grid span {
+  color: #657084;
+  font-size: 12px;
+}
+
+.actions {
+  display: grid;
+  gap: 8px;
+}
+
+button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: #285f8f;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #e8edf3;
+  color: #27313f;
+}
