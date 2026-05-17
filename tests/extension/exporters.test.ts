@@ -47,7 +47,7 @@ describe("AI export builders", () => {
     const files = buildExportFiles([record], 1);
 
     expect(files.map((file) => file.filename)).toEqual([
-      "快速综述材料/第001批.md",
+      "快速综述材料/第001批.txt",
       "知网文献列表.csv",
       "使用说明.txt"
     ]);

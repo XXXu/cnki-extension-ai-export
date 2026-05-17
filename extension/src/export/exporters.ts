@@ -89,7 +89,7 @@ export function buildBatches(records: CnkiRecord[], batchSize = 100) {
     const batchNumber = String(batches.length + 1).padStart(3, "0");
     const batchRecords = records.slice(index, index + batchSize);
     batches.push({
-      filename: `快速综述材料/第${batchNumber}批.md`,
+      filename: `快速综述材料/第${batchNumber}批.txt`,
       content: [
         buildAnalysisPrompt(),
         "",
@@ -306,7 +306,7 @@ export function buildExportFiles(records: CnkiRecord[], batchSize = 100): Export
     ...buildBatches(records, batchSize).map((batch) => ({
       filename: batch.filename,
       content: batch.content,
-      mimeType: "text/markdown;charset=utf-8"
+      mimeType: "text/plain;charset=utf-8"
     })),
     { filename: "知网文献列表.csv", content: buildCsv(records), mimeType: "text/csv;charset=utf-8" },
     { filename: "使用说明.txt", content: buildReadme(), mimeType: "text/plain;charset=utf-8" }
