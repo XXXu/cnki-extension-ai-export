@@ -169,4 +169,29 @@ describe("service worker messages", () => {
     expect(html).toContain("P0001");
     expect(html).toContain("党建引领基层治理的实践路径研究");
   });
+
+  it("下载 Word 文档时清理报告中的 Markdown 标记", async () => {
+    const download = vi.fn().mockResolvedValue(1);
+    vi.stubGlobal("chrome", {
+      downloads: { download }
+    });
+
+    await downloadWordFile(
+      "report.doc",
+      "测试报告",
+      "### **快速综述素材**\n\n#### **1. 主题分类**\n\n---\n\n- **P0001** 代表性论文\n\n1. **第一点**",
+      []
+    );
+
+    const [{ url }] = download.mock.calls[0];
+    const html = decodeURIComponent(url.slice(url.indexOf(",") + 1));
+    expect(html).toContain("<h3><strong>快速综述素材</strong></h3>");
+    expect(html).toContain("<h4><strong>1. 主题分类</strong></h4>");
+    expect(html).toContain("<hr>");
+    expect(html).toContain("&bull; <strong>P0001</strong> 代表性论文");
+    expect(html).toContain("1. <strong>第一点</strong>");
+    expect(html).not.toContain("####");
+    expect(html).not.toContain("**");
+    expect(html).not.toContain("<p>---</p>");
+  });
 });

@@ -53,18 +53,36 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
+function formatInlineMarkdown(value: string) {
+  return escapeHtml(value)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
 function markdownToWordHtml(markdown: string) {
   return markdown
     .split(/\r?\n/)
     .map((line) => {
       const text = line.trim();
       if (!text) return "";
-      if (text.startsWith("### ")) return `<h3>${escapeHtml(text.slice(4))}</h3>`;
-      if (text.startsWith("## ")) return `<h2>${escapeHtml(text.slice(3))}</h2>`;
-      if (text.startsWith("# ")) return `<h1>${escapeHtml(text.slice(2))}</h1>`;
-      if (/^[-*]\s+/.test(text)) return `<p>• ${escapeHtml(text.replace(/^[-*]\s+/, ""))}</p>`;
-      if (/^\d+\.\s+/.test(text)) return `<p>${escapeHtml(text)}</p>`;
-      return `<p>${escapeHtml(text)}</p>`;
+      if (/^-{3,}$/.test(text)) return "<hr>";
+
+      const heading = text.match(/^(#{1,6})\s+(.+)$/);
+      if (heading) {
+        const level = Math.min(heading[1].length, 4);
+        return `<h${level}>${formatInlineMarkdown(heading[2])}</h${level}>`;
+      }
+
+      if (/^[-*•]\s+/.test(text)) {
+        return `<p class="list-item">&bull; ${formatInlineMarkdown(text.replace(/^[-*•]\s+/, ""))}</p>`;
+      }
+
+      const numbered = text.match(/^(\d+)\.\s+(.+)$/);
+      if (numbered) {
+        return `<p class="list-item">${numbered[1]}. ${formatInlineMarkdown(numbered[2])}</p>`;
+      }
+
+      return `<p>${formatInlineMarkdown(text)}</p>`;
     })
     .filter(Boolean)
     .join("\n");
@@ -112,7 +130,12 @@ export async function downloadWordFile(filename: string, title: string, markdown
     h1 { font-size: 22pt; margin: 0 0 18pt; }
     h2 { font-size: 16pt; margin: 18pt 0 8pt; }
     h3 { font-size: 13pt; margin: 14pt 0 6pt; }
+    h4 { font-size: 11.5pt; margin: 10pt 0 5pt; }
     p { font-size: 11pt; margin: 0 0 8pt; }
+    p.list-item { margin-left: 14pt; }
+    strong { font-weight: 700; }
+    code { font-family: Consolas, monospace; background: #f3f4f6; }
+    hr { border: 0; border-top: 1px solid #cbd5e1; margin: 12pt 0; }
     table { border-collapse: collapse; width: 100%; margin-top: 8pt; }
     th, td { border: 1px solid #9ca3af; padding: 5pt; font-size: 9.5pt; vertical-align: top; }
     th { background: #eef2f7; font-weight: 700; }
