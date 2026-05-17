@@ -479,4 +479,31 @@ describe("popup", () => {
 
     expect((await screen.findByText("导入PDF") as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("清空按钮使用当前信息文案", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("清空当前信息")).toBeTruthy();
+    expect(screen.queryByText("清空当前项目")).toBeNull();
+  });
 });

@@ -599,7 +599,7 @@ export function App() {
         quickReviewReport: response.project.quickReviewReport,
         deepReviewReport: response.project.deepReviewReport
       });
-      setStatus("已清空当前项目");
+      setStatus("已清空当前信息");
     }
   }
 
@@ -717,7 +717,7 @@ export function App() {
       </section>
 
       <div className="footer-actions">
-        <button type="button" className="secondary" onClick={clearProject}>清空当前项目</button>
+        <button type="button" className="secondary" onClick={clearProject}>清空当前信息</button>
       </div>
       <input
         ref={fileInputRef}
