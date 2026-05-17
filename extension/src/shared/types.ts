@@ -37,4 +37,8 @@ export type ProjectState = {
     content: string;
     generatedAt: string;
   };
+  deepReviewReport?: {
+    content: string;
+    generatedAt: string;
+  };
 };

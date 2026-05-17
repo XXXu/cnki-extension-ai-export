@@ -59,4 +59,30 @@ describe("service worker messages", () => {
 
     expect(response).toEqual({ ok: false, error: "尚未生成快速综述报告" });
   });
+
+  it("保存深度综述报告", async () => {
+    const saveProject = vi.fn(async (nextProject: ProjectState) => nextProject);
+    const loadProject = vi.fn().mockResolvedValue(project);
+    const response = await handleRuntimeMessage(
+      { type: "SAVE_DEEP_REVIEW_REPORT", report: "深度综述报告正文" },
+      { loadProject, saveProject } as never
+    );
+
+    expect(saveProject).toHaveBeenCalledWith(expect.objectContaining({
+      deepReviewReport: expect.objectContaining({
+        content: "深度综述报告正文"
+      })
+    }));
+    expect(response).toMatchObject({ ok: true });
+  });
+
+  it("没有深度综述报告时拒绝下载", async () => {
+    const loadProject = vi.fn().mockResolvedValue(project);
+    const response = await handleRuntimeMessage(
+      { type: "DOWNLOAD_DEEP_REVIEW_REPORT" },
+      { loadProject } as never
+    );
+
+    expect(response).toEqual({ ok: false, error: "尚未生成深度综述报告" });
+  });
 });

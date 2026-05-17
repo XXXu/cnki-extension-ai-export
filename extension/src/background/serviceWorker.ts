@@ -9,7 +9,9 @@ type RuntimeMessage =
   | { type: "CLEAR_PROJECT" }
   | { type: "EXPORT_PACKAGE" }
   | { type: "SAVE_QUICK_REVIEW_REPORT"; report: string }
-  | { type: "DOWNLOAD_QUICK_REVIEW_REPORT" };
+  | { type: "DOWNLOAD_QUICK_REVIEW_REPORT" }
+  | { type: "SAVE_DEEP_REVIEW_REPORT"; report: string }
+  | { type: "DOWNLOAD_DEEP_REVIEW_REPORT" };
 
 type Dependencies = Partial<{
   appendRecords: typeof appendRecords;
@@ -94,6 +96,31 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
     await services.downloadTextFile(
       `cnki-quick-review-${Date.now()}.md`,
       project.quickReviewReport.content
+    );
+    return { ok: true };
+  }
+
+  if (message.type === "SAVE_DEEP_REVIEW_REPORT") {
+    const project = await services.loadProject();
+    const next = await services.saveProject({
+      ...project,
+      deepReviewReport: {
+        content: message.report,
+        generatedAt: new Date().toISOString()
+      }
+    });
+    return { ok: true, project: next };
+  }
+
+  if (message.type === "DOWNLOAD_DEEP_REVIEW_REPORT") {
+    const project = await services.loadProject();
+    if (!project.deepReviewReport?.content) {
+      return { ok: false, error: "尚未生成深度综述报告" };
+    }
+
+    await services.downloadTextFile(
+      `cnki-deep-review-${Date.now()}.md`,
+      project.deepReviewReport.content
     );
     return { ok: true };
   }

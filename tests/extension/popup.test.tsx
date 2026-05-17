@@ -149,6 +149,83 @@ describe("popup", () => {
     });
   });
 
+  it("导入全文后生成深度综述并启用报告下载", async () => {
+    const matchedRecord = {
+      ...listOnlyRecord,
+      abstract: "这是一段摘要。",
+      keywords: ["基层治理"],
+      fullText: "这是一段 PDF 全文。",
+      fullTextStatus: "matched"
+    };
+    localStorage.setItem("cnkiReviewAuth", JSON.stringify({
+      token: "test-token",
+      user: {
+        id: "u1",
+        email: "student@example.com",
+        quickReviewQuota: 2,
+        deepReviewQuota: 1
+      }
+    }));
+    const sendMessage = vi.fn((message: { type: string; report?: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [matchedRecord],
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_DEEP_REVIEW_REPORT") {
+        callback({
+          ok: true,
+          project: {
+            records: [matchedRecord],
+            failures: [],
+            deepReviewReport: {
+              content: message.report,
+              generatedAt: "2026-05-17T00:00:00.000Z"
+            }
+          }
+        });
+      }
+      if (message.type === "DOWNLOAD_DEEP_REVIEW_REPORT") {
+        callback({ ok: true });
+      }
+    });
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      report: "深度综述报告正文",
+      quota: { quickReviewQuota: 2, deepReviewQuota: 0 }
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("student@example.com")).toBeTruthy();
+    fireEvent.click(screen.getByText("生成深度综述"));
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        { type: "SAVE_DEEP_REVIEW_REPORT", report: "深度综述报告正文" },
+        expect.any(Function)
+      );
+    });
+    expect(await screen.findByText("深度综述已生成")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("下载深度综述报告"));
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_DEEP_REVIEW_REPORT" }, expect.any(Function));
+    });
+  });
+
   it("点击采集并补全后保存完整记录", async () => {
     const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
       if (message.type === "GET_PROJECT") {

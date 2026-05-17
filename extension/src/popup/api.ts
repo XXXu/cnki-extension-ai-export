@@ -19,6 +19,8 @@ export type QuickReviewResponse = {
   quota: Pick<BackendUser, "quickReviewQuota" | "deepReviewQuota">;
 };
 
+export type DeepReviewResponse = QuickReviewResponse;
+
 type ApiErrorBody = {
   error?: string;
   message?: string;
@@ -78,6 +80,24 @@ export function generateQuickReview(token: string, records: CnkiRecord[]) {
         abstract: record.abstract,
         keywords: record.keywords
       }))
+    })
+  });
+}
+
+export function generateDeepReview(token: string, records: CnkiRecord[]) {
+  return requestJson<DeepReviewResponse>("/review/deep", {
+    method: "POST",
+    token,
+    body: JSON.stringify({
+      papers: records
+        .filter((record) => record.fullText)
+        .map((record) => ({
+          id: record.id,
+          title: record.title,
+          abstract: record.abstract,
+          keywords: record.keywords,
+          fullText: record.fullText
+        }))
     })
   });
 }

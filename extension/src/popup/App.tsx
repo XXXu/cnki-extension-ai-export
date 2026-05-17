@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { generateQuickReview, login, register, type AuthSession } from "./api";
+import { generateDeepReview, generateQuickReview, login, register, type AuthSession } from "./api";
 import { matchFullTextToRecord } from "../fulltext/fullText";
 import type { CnkiRecord } from "../shared/types";
 
@@ -7,6 +7,10 @@ type ProjectSnapshot = {
   records: CnkiRecord[];
   failures: Array<{ url: string; reason: string }>;
   quickReviewReport?: {
+    content: string;
+    generatedAt: string;
+  };
+  deepReviewReport?: {
     content: string;
     generatedAt: string;
   };
@@ -295,8 +299,10 @@ export function App() {
   const [password, setPassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const completeCount = project.records.filter((record) => record.status === "complete").length;
+  const fullTextCount = project.records.filter((record) => Boolean(record.fullText)).length;
   const hasRecords = project.records.length > 0;
   const hasQuickReviewReport = Boolean(project.quickReviewReport?.content);
+  const hasDeepReviewReport = Boolean(project.deepReviewReport?.content);
 
   async function refresh() {
     const response = await sendRuntimeMessage<{ project: ProjectSnapshot }>({ type: "GET_PROJECT" });
@@ -304,7 +310,8 @@ export function App() {
       setProject({
         records: response.project.records ?? [],
         failures: response.project.failures ?? [],
-        quickReviewReport: response.project.quickReviewReport
+        quickReviewReport: response.project.quickReviewReport,
+        deepReviewReport: response.project.deepReviewReport
       });
     }
   }
@@ -456,11 +463,12 @@ export function App() {
         report: response.report
       });
       if (saveResponse.ok) {
-        setProject({
-          records: saveResponse.project.records ?? [],
-          failures: saveResponse.project.failures ?? [],
-          quickReviewReport: saveResponse.project.quickReviewReport
-        });
+      setProject({
+        records: saveResponse.project.records ?? [],
+        failures: saveResponse.project.failures ?? [],
+        quickReviewReport: saveResponse.project.quickReviewReport,
+        deepReviewReport: saveResponse.project.deepReviewReport
+      });
       }
       setStatus("快速综述已生成");
     } catch (error) {
@@ -471,6 +479,56 @@ export function App() {
   async function downloadQuickReviewReport() {
     const response = await sendRuntimeMessage({ type: "DOWNLOAD_QUICK_REVIEW_REPORT" });
     setStatus(response.ok ? "已下载快速综述报告" : response.error ?? "下载快速综述报告失败");
+  }
+
+  async function createDeepReview() {
+    if (!hasRecords) {
+      setStatus("请先采集当前页");
+      return;
+    }
+    if (!auth) {
+      setStatus("请先登录后生成深度综述");
+      return;
+    }
+    if (fullTextCount === 0) {
+      setStatus("请先导入并匹配 PDF 全文");
+      return;
+    }
+
+    try {
+      setStatus("正在生成深度综述");
+      const response = await generateDeepReview(auth.token, project.records);
+      const nextAuth = {
+        ...auth,
+        user: {
+          ...auth.user,
+          quickReviewQuota: response.quota.quickReviewQuota,
+          deepReviewQuota: response.quota.deepReviewQuota
+        }
+      };
+      setAuth(nextAuth);
+      saveAuthSession(nextAuth);
+      const saveResponse = await sendRuntimeMessage<{ project: ProjectSnapshot }>({
+        type: "SAVE_DEEP_REVIEW_REPORT",
+        report: response.report
+      });
+      if (saveResponse.ok) {
+        setProject({
+          records: saveResponse.project.records ?? [],
+          failures: saveResponse.project.failures ?? [],
+          quickReviewReport: saveResponse.project.quickReviewReport,
+          deepReviewReport: saveResponse.project.deepReviewReport
+        });
+      }
+      setStatus("深度综述已生成");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "深度综述生成失败");
+    }
+  }
+
+  async function downloadDeepReviewReport() {
+    const response = await sendRuntimeMessage({ type: "DOWNLOAD_DEEP_REVIEW_REPORT" });
+    setStatus(response.ok ? "已下载深度综述报告" : response.error ?? "下载深度综述报告失败");
   }
 
   async function importFullTextPdfs(files: FileList | null) {
@@ -526,7 +584,8 @@ export function App() {
       setProject({
         records: response.project.records ?? [],
         failures: response.project.failures ?? [],
-        quickReviewReport: response.project.quickReviewReport
+        quickReviewReport: response.project.quickReviewReport,
+        deepReviewReport: response.project.deepReviewReport
       });
       setStatus("已清空当前项目");
     }
@@ -561,6 +620,10 @@ export function App() {
           <span>失败</span>
           <strong>{project.failures.length} 篇</strong>
         </div>
+        <div>
+          <span>已导全文</span>
+          <strong>{fullTextCount} 篇</strong>
+        </div>
       </section>
 
       <section className="auth-panel" aria-label="账号">
@@ -573,6 +636,10 @@ export function App() {
             <div>
               <span>快速综述</span>
               <strong>{auth.user.quickReviewQuota} 次</strong>
+            </div>
+            <div>
+              <span>深度综述</span>
+              <strong>{auth.user.deepReviewQuota} 次</strong>
             </div>
           </div>
         ) : (
@@ -626,8 +693,21 @@ export function App() {
         <h2>深度综述</h2>
         <div className="actions">
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords}>导入全文 PDF</button>
-          <button type="button" disabled>生成深度综述</button>
-          <button type="button" className="secondary" disabled>下载深度综述报告</button>
+          <button
+            type="button"
+            onClick={createDeepReview}
+            disabled={!hasRecords || !auth || fullTextCount === 0 || auth.user.deepReviewQuota < 1}
+          >
+            生成深度综述
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={downloadDeepReviewReport}
+            disabled={!hasDeepReviewReport}
+          >
+            下载深度综述报告
+          </button>
         </div>
       </section>
 
