@@ -1,0 +1,2 @@
+export const QUICK_REVIEW_MAX_PAPERS = 200;
+export const DEEP_REVIEW_MAX_PAPERS = 50;

@@ -1,4 +1,5 @@
 import { resolveApiBaseUrl } from "../shared/apiConfig";
+import { DEEP_REVIEW_MAX_PAPERS, QUICK_REVIEW_MAX_PAPERS } from "../shared/reviewLimits";
 import type { CnkiRecord } from "../shared/types";
 
 export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
@@ -38,6 +39,8 @@ async function readError(response: Response) {
     if (error === "UNAUTHORIZED") return "登录已失效，请重新登录";
     if (error === "QUICK_REVIEW_QUOTA_EXHAUSTED") return "快速综述次数已用完";
     if (error === "DEEP_REVIEW_QUOTA_EXHAUSTED") return "深度综述次数已用完";
+    if (error === "QUICK_REVIEW_PAPER_LIMIT_EXCEEDED") return `快速综述最多支持 ${QUICK_REVIEW_MAX_PAPERS} 篇`;
+    if (error === "DEEP_REVIEW_PAPER_LIMIT_EXCEEDED") return `深度综述最多支持 ${DEEP_REVIEW_MAX_PAPERS} 篇 PDF`;
     return error;
   } catch {
     return `HTTP_${response.status}`;

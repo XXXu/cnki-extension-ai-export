@@ -27,6 +27,21 @@ const listOnlyRecord = {
   status: "list-only"
 };
 
+function makeRecords(count: number, withFullText = false) {
+  return Array.from({ length: count }, (_, index) => ({
+    ...listOnlyRecord,
+    id: `P${String(index + 1).padStart(4, "0")}`,
+    title: `测试论文 ${index + 1}`,
+    abstract: "这是一段摘要。",
+    keywords: ["文献综述"],
+    status: "complete",
+    ...(withFullText ? {
+      fullText: "这是一段 PDF 全文。",
+      fullTextStatus: "matched"
+    } : {})
+  }));
+}
+
 describe("popup", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -147,6 +162,47 @@ describe("popup", () => {
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_QUICK_REVIEW_REPORT" }, expect.any(Function));
     });
+  });
+
+  it("快速综述超过 200 篇时不发起请求", async () => {
+    localStorage.setItem("cnkiReviewAuth", JSON.stringify({
+      token: "test-token",
+      user: {
+        id: "u1",
+        email: "student@example.com",
+        quickReviewQuota: 3,
+        deepReviewQuota: 1
+      }
+    }));
+    const fetch = vi.fn();
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: makeRecords(201),
+            failures: []
+          }
+        });
+      }
+    });
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("student@example.com")).toBeTruthy();
+    fireEvent.click(screen.getByText("生成快速综述"));
+
+    expect(await screen.findByText("快速综述最多支持 200 篇，请减少后再生成")).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("注册前校验邮箱格式", async () => {
@@ -290,6 +346,47 @@ describe("popup", () => {
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_DEEP_REVIEW_REPORT" }, expect.any(Function));
     });
+  });
+
+  it("深度综述超过 50 篇 PDF 时不发起请求", async () => {
+    localStorage.setItem("cnkiReviewAuth", JSON.stringify({
+      token: "test-token",
+      user: {
+        id: "u1",
+        email: "student@example.com",
+        quickReviewQuota: 2,
+        deepReviewQuota: 1
+      }
+    }));
+    const fetch = vi.fn();
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: makeRecords(51, true),
+            failures: []
+          }
+        });
+      }
+    });
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("student@example.com")).toBeTruthy();
+    fireEvent.click(screen.getByText("生成深度综述"));
+
+    expect(await screen.findByText("深度综述最多支持 50 篇 PDF，请减少后再生成")).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("点击采集并补全后保存完整记录", async () => {

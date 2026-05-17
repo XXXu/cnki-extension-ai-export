@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { generateDeepReview, generateQuickReview, login, register, type AuthSession } from "./api";
 import { matchFullTextToRecord } from "../fulltext/fullText";
+import { DEEP_REVIEW_MAX_PAPERS, QUICK_REVIEW_MAX_PAPERS } from "../shared/reviewLimits";
 import type { CnkiRecord } from "../shared/types";
 
 type ProjectSnapshot = {
@@ -456,6 +457,10 @@ export function App() {
       setStatus("请先登录后生成快速综述");
       return;
     }
+    if (project.records.length > QUICK_REVIEW_MAX_PAPERS) {
+      setStatus(`快速综述最多支持 ${QUICK_REVIEW_MAX_PAPERS} 篇，请减少后再生成`);
+      return;
+    }
 
     try {
       setStatus("正在生成快速综述");
@@ -504,6 +509,10 @@ export function App() {
     }
     if (fullTextCount === 0) {
       setStatus("请先导入并匹配 PDF 全文");
+      return;
+    }
+    if (fullTextCount > DEEP_REVIEW_MAX_PAPERS) {
+      setStatus(`深度综述最多支持 ${DEEP_REVIEW_MAX_PAPERS} 篇 PDF，请减少后再生成`);
       return;
     }
 
