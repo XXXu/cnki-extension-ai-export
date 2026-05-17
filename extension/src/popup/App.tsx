@@ -620,7 +620,7 @@ export function App() {
           <strong>{project.failures.length} 篇</strong>
         </div>
         <div>
-          <span>已导全文</span>
+          <span>已导PDF</span>
           <strong>{fullTextCount} 篇</strong>
         </div>
       </section>
