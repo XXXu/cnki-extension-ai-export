@@ -7,13 +7,16 @@ type RuntimeMessage =
   | { type: "SAVE_RECORDS"; records: CnkiRecord[] }
   | { type: "GET_PROJECT" }
   | { type: "CLEAR_PROJECT" }
-  | { type: "EXPORT_PACKAGE" };
+  | { type: "EXPORT_PACKAGE" }
+  | { type: "SAVE_QUICK_REVIEW_REPORT"; report: string }
+  | { type: "DOWNLOAD_QUICK_REVIEW_REPORT" };
 
 type Dependencies = Partial<{
   appendRecords: typeof appendRecords;
   loadProject: typeof loadProject;
   saveProject: typeof saveProject;
   downloadZip: typeof downloadZip;
+  downloadTextFile: typeof downloadTextFile;
 }>;
 
 export async function downloadZip(project: ProjectState) {
@@ -31,12 +34,21 @@ export async function downloadZip(project: ProjectState) {
   });
 }
 
+export async function downloadTextFile(filename: string, content: string) {
+  await chrome.downloads.download({
+    url: `data:text/markdown;charset=utf-8,${encodeURIComponent(content)}`,
+    filename,
+    saveAs: true
+  });
+}
+
 export async function handleRuntimeMessage(message: RuntimeMessage, deps: Dependencies = {}) {
   const services = {
     appendRecords,
     loadProject,
     saveProject,
     downloadZip,
+    downloadTextFile,
     ...deps
   };
 
@@ -59,6 +71,31 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
     const project = await services.loadProject();
     await services.downloadZip(project);
     return { ok: true, count: project.records.length };
+  }
+
+  if (message.type === "SAVE_QUICK_REVIEW_REPORT") {
+    const project = await services.loadProject();
+    const next = await services.saveProject({
+      ...project,
+      quickReviewReport: {
+        content: message.report,
+        generatedAt: new Date().toISOString()
+      }
+    });
+    return { ok: true, project: next };
+  }
+
+  if (message.type === "DOWNLOAD_QUICK_REVIEW_REPORT") {
+    const project = await services.loadProject();
+    if (!project.quickReviewReport?.content) {
+      return { ok: false, error: "尚未生成快速综述报告" };
+    }
+
+    await services.downloadTextFile(
+      `cnki-quick-review-${Date.now()}.md`,
+      project.quickReviewReport.content
+    );
+    return { ok: true };
   }
 
   return { ok: false, error: "不支持的后台消息" };

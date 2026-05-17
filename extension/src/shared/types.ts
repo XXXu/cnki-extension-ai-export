@@ -33,4 +33,8 @@ export type ProjectState = {
   failures: Array<{ url: string; reason: string }>;
   paused: boolean;
   updatedAt: string;
+  quickReviewReport?: {
+    content: string;
+    generatedAt: string;
+  };
 };

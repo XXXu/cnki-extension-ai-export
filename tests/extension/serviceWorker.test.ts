@@ -33,4 +33,30 @@ describe("service worker messages", () => {
     expect(downloadZip).toHaveBeenCalledWith(project);
     expect(response).toEqual({ ok: true, count: 1 });
   });
+
+  it("保存快速综述报告", async () => {
+    const saveProject = vi.fn(async (nextProject: ProjectState) => nextProject);
+    const loadProject = vi.fn().mockResolvedValue(project);
+    const response = await handleRuntimeMessage(
+      { type: "SAVE_QUICK_REVIEW_REPORT", report: "快速综述报告正文" },
+      { loadProject, saveProject } as never
+    );
+
+    expect(saveProject).toHaveBeenCalledWith(expect.objectContaining({
+      quickReviewReport: expect.objectContaining({
+        content: "快速综述报告正文"
+      })
+    }));
+    expect(response).toMatchObject({ ok: true });
+  });
+
+  it("没有快速综述报告时拒绝下载", async () => {
+    const loadProject = vi.fn().mockResolvedValue(project);
+    const response = await handleRuntimeMessage(
+      { type: "DOWNLOAD_QUICK_REVIEW_REPORT" },
+      { loadProject } as never
+    );
+
+    expect(response).toEqual({ ok: false, error: "尚未生成快速综述报告" });
+  });
 });

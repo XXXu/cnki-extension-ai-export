@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import { generateQuickReview, login, register, type AuthSession } from "./api";
 import { matchFullTextToRecord } from "../fulltext/fullText";
 import type { CnkiRecord } from "../shared/types";
 
 type ProjectSnapshot = {
   records: CnkiRecord[];
   failures: Array<{ url: string; reason: string }>;
+  quickReviewReport?: {
+    content: string;
+    generatedAt: string;
+  };
 };
 
 type RuntimeResponse<T = unknown> = {
@@ -38,8 +43,27 @@ type DetailFrameResult = {
   };
 };
 
+const AUTH_STORAGE_KEY = "cnkiReviewAuth";
+
 function sendRuntimeMessage<T>(message: object): Promise<RuntimeResponse<T>> {
   return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
+}
+
+function loadAuthSession(): AuthSession | null {
+  try {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as AuthSession : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthSession(session: AuthSession | null) {
+  if (!session) {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
 function queryActiveTab(): Promise<chrome.tabs.Tab | undefined> {
@@ -266,16 +290,41 @@ async function extractDetailFromTab(tabId: number) {
 export function App() {
   const [project, setProject] = useState<ProjectSnapshot>({ records: [], failures: [] });
   const [status, setStatus] = useState("等待采集");
+  const [auth, setAuth] = useState<AuthSession | null>(() => loadAuthSession());
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const completeCount = project.records.filter((record) => record.status === "complete").length;
+  const hasRecords = project.records.length > 0;
+  const hasQuickReviewReport = Boolean(project.quickReviewReport?.content);
 
   async function refresh() {
     const response = await sendRuntimeMessage<{ project: ProjectSnapshot }>({ type: "GET_PROJECT" });
     if (response.ok) {
       setProject({
         records: response.project.records ?? [],
-        failures: response.project.failures ?? []
+        failures: response.project.failures ?? [],
+        quickReviewReport: response.project.quickReviewReport
       });
+    }
+  }
+
+  async function handleAuth(mode: "login" | "register") {
+    if (!email || !password) {
+      setStatus("请填写邮箱和密码");
+      return;
+    }
+
+    try {
+      setStatus(mode === "login" ? "正在登录" : "正在注册");
+      const session = mode === "login"
+        ? await login(email, password)
+        : await register(email, password);
+      setAuth(session);
+      saveAuthSession(session);
+      setStatus(mode === "login" ? "登录成功" : "注册成功");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "账号操作失败");
     }
   }
 
@@ -379,6 +428,51 @@ export function App() {
     setStatus(response.ok ? `已导出 ${response.count} 篇` : response.error ?? "导出失败");
   }
 
+  async function createQuickReview() {
+    if (!hasRecords) {
+      setStatus("请先采集当前页");
+      return;
+    }
+    if (!auth) {
+      setStatus("请先登录后生成快速综述");
+      return;
+    }
+
+    try {
+      setStatus("正在生成快速综述");
+      const response = await generateQuickReview(auth.token, project.records);
+      const nextAuth = {
+        ...auth,
+        user: {
+          ...auth.user,
+          quickReviewQuota: response.quota.quickReviewQuota,
+          deepReviewQuota: response.quota.deepReviewQuota
+        }
+      };
+      setAuth(nextAuth);
+      saveAuthSession(nextAuth);
+      const saveResponse = await sendRuntimeMessage<{ project: ProjectSnapshot }>({
+        type: "SAVE_QUICK_REVIEW_REPORT",
+        report: response.report
+      });
+      if (saveResponse.ok) {
+        setProject({
+          records: saveResponse.project.records ?? [],
+          failures: saveResponse.project.failures ?? [],
+          quickReviewReport: saveResponse.project.quickReviewReport
+        });
+      }
+      setStatus("快速综述已生成");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "快速综述生成失败");
+    }
+  }
+
+  async function downloadQuickReviewReport() {
+    const response = await sendRuntimeMessage({ type: "DOWNLOAD_QUICK_REVIEW_REPORT" });
+    setStatus(response.ok ? "已下载快速综述报告" : response.error ?? "下载快速综述报告失败");
+  }
+
   async function importFullTextPdfs(files: FileList | null) {
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
@@ -431,7 +525,8 @@ export function App() {
     if (response.ok) {
       setProject({
         records: response.project.records ?? [],
-        failures: response.project.failures ?? []
+        failures: response.project.failures ?? [],
+        quickReviewReport: response.project.quickReviewReport
       });
       setStatus("已清空当前项目");
     }
@@ -444,8 +539,8 @@ export function App() {
   return (
     <main className="popup-shell">
       <header>
-        <h1>知网 AI 分析包</h1>
-        <p>采集题录和摘要，导出给 ChatGPT 或 DeepSeek 分析。</p>
+        <h1>知网文献综述助手</h1>
+        <p>先采集知网文献集合，再生成快速综述或下载采集结果。</p>
       </header>
 
       <section className="status-panel">
@@ -468,10 +563,75 @@ export function App() {
         </div>
       </section>
 
+      <section className="auth-panel" aria-label="账号">
+        {auth ? (
+          <div className="account-row">
+            <div>
+              <span>当前账号</span>
+              <strong>{auth.user.email}</strong>
+            </div>
+            <div>
+              <span>快速综述</span>
+              <strong>{auth.user.quickReviewQuota} 次</strong>
+            </div>
+          </div>
+        ) : (
+          <div className="auth-form">
+            <label>
+              邮箱
+              <input value={email} onChange={(event) => setEmail(event.target.value)} />
+            </label>
+            <label>
+              密码
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            </label>
+            <div className="inline-actions">
+              <button type="button" onClick={() => handleAuth("login")}>登录</button>
+              <button type="button" className="secondary" onClick={() => handleAuth("register")}>注册</button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="action-section" aria-label="文献采集">
+        <h2>文献采集</h2>
+        <div className="actions">
+          <button type="button" onClick={collectAndCompleteCurrentPage}>采集当前页并补全摘要</button>
+          <button type="button" onClick={exportPackage} disabled={!hasRecords}>下载采集结果</button>
+        </div>
+      </section>
+
+      <section className="action-section" aria-label="快速综述">
+        <h2>快速综述</h2>
+        <div className="actions">
+          <button
+            type="button"
+            onClick={createQuickReview}
+            disabled={!hasRecords || !auth || auth.user.quickReviewQuota < 1}
+          >
+            生成快速综述
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={downloadQuickReviewReport}
+            disabled={!hasQuickReviewReport}
+          >
+            下载快速综述报告
+          </button>
+        </div>
+      </section>
+
+      <section className="action-section" aria-label="深度综述">
+        <h2>深度综述</h2>
+        <div className="actions">
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords}>导入全文 PDF</button>
+          <button type="button" disabled>生成深度综述</button>
+          <button type="button" className="secondary" disabled>下载深度综述报告</button>
+        </div>
+      </section>
+
       <div className="actions">
-        <button type="button" onClick={collectAndCompleteCurrentPage}>采集当前页并补全摘要</button>
-        <button type="button" onClick={() => fileInputRef.current?.click()}>导入全文 PDF</button>
-        <button type="button" onClick={exportPackage}>导出 AI 分析包</button>
         <button type="button" className="secondary" onClick={clearProject}>清空当前项目</button>
       </div>
       <input

@@ -9,7 +9,8 @@ export function createEmptyProject(): ProjectState {
     records: [],
     failures: [],
     paused: false,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    quickReviewReport: undefined
   };
 }
 

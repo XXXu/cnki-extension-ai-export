@@ -30,9 +30,10 @@ const listOnlyRecord = {
 describe("popup", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
-  it("显示采集数量并触发导出动作", async () => {
+  it("显示采集数量并触发下载采集结果动作", async () => {
     const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
       if (message.type === "GET_PROJECT") {
         callback({
@@ -61,12 +62,91 @@ describe("popup", () => {
     await waitFor(() => {
       expect(screen.getAllByText("1 篇")).toHaveLength(2);
     });
-    fireEvent.click(screen.getByText("导出 AI 分析包"));
+    fireEvent.click(screen.getByText("下载采集结果"));
 
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "EXPORT_PACKAGE" }, expect.any(Function));
     });
     expect(await screen.findByText("已导出 1 篇")).toBeTruthy();
+  });
+
+  it("登录后生成快速综述并启用报告下载", async () => {
+    const sendMessage = vi.fn((message: { type: string; report?: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [{
+              ...listOnlyRecord,
+              abstract: "这是一段摘要。",
+              keywords: ["基层治理"]
+            }],
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_QUICK_REVIEW_REPORT") {
+        callback({
+          ok: true,
+          project: {
+            records: [listOnlyRecord],
+            failures: [],
+            quickReviewReport: {
+              content: message.report,
+              generatedAt: "2026-05-17T00:00:00.000Z"
+            }
+          }
+        });
+      }
+      if (message.type === "DOWNLOAD_QUICK_REVIEW_REPORT") {
+        callback({ ok: true });
+      }
+    });
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        token: "test-token",
+        user: {
+          id: "u1",
+          email: "student@example.com",
+          quickReviewQuota: 3,
+          deepReviewQuota: 0
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        report: "快速综述报告正文",
+        quota: { quickReviewQuota: 2, deepReviewQuota: 0 }
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "student@example.com" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "password123" } });
+    fireEvent.click(screen.getByText("登录"));
+
+    expect(await screen.findByText("student@example.com")).toBeTruthy();
+    fireEvent.click(screen.getByText("生成快速综述"));
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        { type: "SAVE_QUICK_REVIEW_REPORT", report: "快速综述报告正文" },
+        expect.any(Function)
+      );
+    });
+    expect(await screen.findByText("快速综述已生成")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("下载快速综述报告"));
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_QUICK_REVIEW_REPORT" }, expect.any(Function));
+    });
   });
 
   it("点击采集并补全后保存完整记录", async () => {
