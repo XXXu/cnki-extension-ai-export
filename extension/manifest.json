@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "采集知网论文题录、摘要和关键词，支持快速综述；登录后可导入PDF生成深度综述报告。",
   "permissions": ["activeTab", "scripting", "storage", "downloads", "tabs"],
-  "host_permissions": ["https://*.cnki.net/*", "https://*.cnki.com.cn/*", "http://127.0.0.1:3000/*"],
+  "host_permissions": ["https://*.cnki.net/*", "https://*.cnki.com.cn/*"],
   "action": {
     "default_popup": "extension/src/popup/popup.html",
     "default_title": "知网文献综述助手"

@@ -43,3 +43,25 @@
 - `npm.cmd run build`：构建可加载的扩展目录。
 
 在 PowerShell 中请优先使用 `npm.cmd`，避免系统执行策略拦截 `npm.ps1`。
+
+## 后端地址配置
+
+插件默认连接本地后端：
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:3000
+```
+
+如果要打包连接腾讯云主机的版本，在构建前创建或修改 `.env`：
+
+```env
+VITE_API_BASE_URL=https://你的后端域名
+```
+
+然后重新执行：
+
+```powershell
+npm.cmd run build
+```
+
+构建时会同时把 `dist/manifest.json` 里的后端访问权限改成对应域名。正式发布建议使用域名和 HTTPS，不建议直接使用公网 IP 暴露 HTTP 服务。

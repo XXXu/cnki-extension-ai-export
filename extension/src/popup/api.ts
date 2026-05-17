@@ -1,6 +1,8 @@
+import { resolveApiBaseUrl } from "../shared/apiConfig";
 import type { CnkiRecord } from "../shared/types";
 
-export const DEFAULT_API_BASE_URL = "http://127.0.0.1:3000";
+export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+export { DEFAULT_API_BASE_URL, resolveApiBaseUrl } from "../shared/apiConfig";
 
 export type BackendUser = {
   id: string;
@@ -50,7 +52,7 @@ async function requestJson<T>(
   headers.set("content-type", "application/json");
   if (options.token) headers.set("authorization", `Bearer ${options.token}`);
 
-  const response = await fetch(`${DEFAULT_API_BASE_URL}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers
   });
