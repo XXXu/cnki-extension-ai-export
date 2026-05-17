@@ -683,7 +683,7 @@ export function App() {
           </button>
         </div>
 
-        <div className="action-row">
+        <div className="action-row deep-row">
           <span>深度</span>
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords}>导入PDF</button>
           <button
