@@ -70,7 +70,38 @@ function markdownToWordHtml(markdown: string) {
     .join("\n");
 }
 
-export async function downloadWordFile(filename: string, title: string, markdown: string) {
+function buildPaperListHtml(records: CnkiRecord[]) {
+  if (records.length === 0) return "";
+
+  const rows = records.map((record) => `<tr>
+    <td>${escapeHtml(record.id)}</td>
+    <td>${escapeHtml(record.title || "-")}</td>
+    <td>${escapeHtml(record.authors?.join("；") || "-")}</td>
+    <td>${escapeHtml(record.source || "-")}</td>
+    <td>${escapeHtml(record.publishedAt || "-")}</td>
+    <td>${escapeHtml(record.keywords?.join("；") || "-")}</td>
+  </tr>`).join("\n");
+
+  return `<h2>采集论文列表</h2>
+<p>报告正文中的论文ID可在下表中对应到具体论文。</p>
+<table>
+  <thead>
+    <tr>
+      <th>论文ID</th>
+      <th>题名</th>
+      <th>作者</th>
+      <th>来源</th>
+      <th>发表时间</th>
+      <th>关键词</th>
+    </tr>
+  </thead>
+  <tbody>
+${rows}
+  </tbody>
+</table>`;
+}
+
+export async function downloadWordFile(filename: string, title: string, markdown: string, records: CnkiRecord[] = []) {
   const html = `<!doctype html>
 <html>
 <head>
@@ -82,10 +113,14 @@ export async function downloadWordFile(filename: string, title: string, markdown
     h2 { font-size: 16pt; margin: 18pt 0 8pt; }
     h3 { font-size: 13pt; margin: 14pt 0 6pt; }
     p { font-size: 11pt; margin: 0 0 8pt; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8pt; }
+    th, td { border: 1px solid #9ca3af; padding: 5pt; font-size: 9.5pt; vertical-align: top; }
+    th { background: #eef2f7; font-weight: 700; }
   </style>
 </head>
 <body>
 ${markdownToWordHtml(markdown)}
+${buildPaperListHtml(records)}
 </body>
 </html>`;
 
@@ -149,7 +184,8 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
     await services.downloadWordFile(
       `cnki-quick-review-${Date.now()}.doc`,
       "知网快速综述报告",
-      project.quickReviewReport.content
+      project.quickReviewReport.content,
+      project.records
     );
     return { ok: true };
   }
@@ -175,7 +211,8 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
     await services.downloadWordFile(
       `cnki-deep-review-${Date.now()}.doc`,
       "知网深度综述报告",
-      project.deepReviewReport.content
+      project.deepReviewReport.content,
+      project.records
     );
     return { ok: true };
   }
