@@ -62,7 +62,7 @@ describe("popup", () => {
     await waitFor(() => {
       expect(screen.getAllByText("1 篇")).toHaveLength(2);
     });
-    fireEvent.click(screen.getByText("下载结果"));
+    fireEvent.click(screen.getAllByText("下载报告")[0]);
 
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "EXPORT_PACKAGE" }, expect.any(Function));
@@ -143,7 +143,7 @@ describe("popup", () => {
     });
     expect(await screen.findByText("快速综述已生成")).toBeTruthy();
 
-    fireEvent.click(screen.getAllByText("下载报告")[0]);
+    fireEvent.click(screen.getAllByText("下载报告")[1]);
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_QUICK_REVIEW_REPORT" }, expect.any(Function));
     });
@@ -286,7 +286,7 @@ describe("popup", () => {
     });
     expect(await screen.findByText("深度综述已生成")).toBeTruthy();
 
-    fireEvent.click(screen.getAllByText("下载报告")[1]);
+    fireEvent.click(screen.getAllByText("下载报告")[2]);
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_DEEP_REVIEW_REPORT" }, expect.any(Function));
     });

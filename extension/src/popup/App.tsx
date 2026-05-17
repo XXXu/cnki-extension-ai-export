@@ -673,7 +673,7 @@ export function App() {
         <div className="action-row primary-row">
           <span>采集</span>
           <button type="button" onClick={collectAndCompleteCurrentPage}>采集当前页</button>
-          <button type="button" className="secondary" onClick={exportPackage} disabled={!hasRecords}>下载结果</button>
+          <button type="button" className="secondary" onClick={exportPackage} disabled={!hasRecords}>下载报告</button>
         </div>
 
         <div className="action-row">
