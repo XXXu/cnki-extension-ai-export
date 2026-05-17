@@ -249,9 +249,9 @@ describe("popup", () => {
       }
     });
     const query = vi.fn((_options, callback) => callback([{ id: 7 }]));
-    const create = vi.fn((_options, callback) => callback({ id: 88 }));
+    const create = vi.fn((_options, callback) => callback({ id: 88, status: "complete" }));
     const remove = vi.fn((_tabId, callback) => callback?.());
-    const addListener = vi.fn((listener) => listener(88, { status: "complete" }, { id: 88 }));
+    const addListener = vi.fn();
     const removeListener = vi.fn();
     const executeScript = vi.fn()
       .mockResolvedValueOnce([
@@ -319,6 +319,9 @@ describe("popup", () => {
       );
     });
     expect(await screen.findByText("已采集 1 篇，已补全 1 篇，失败 0 篇")).toBeTruthy();
+    await waitFor(() => {
+      expect(remove).toHaveBeenCalledWith(88, expect.any(Function));
+    });
   });
 
   it("导入 PDF 全文后保存匹配记录", async () => {

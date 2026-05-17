@@ -378,7 +378,9 @@ export function App() {
         const tab = await createDetailTab(record.detailUrl);
         tabId = tab.id;
         if (!tabId) throw new Error("详情页标签页创建失败");
-        await waitForTabLoad(tabId);
+        if (tab.status !== "complete") {
+          await waitForTabLoad(tabId);
+        }
         const result = await extractDetailFromTab(tabId);
         const detail = result?.detail ?? {};
         if (!detail.abstract && (!detail.keywords || detail.keywords.length === 0)) {
