@@ -598,14 +598,11 @@ export function App() {
   return (
     <main className="popup-shell">
       <header>
-        <h1>知网文献综述助手</h1>
-        <p>先采集知网文献集合，再生成快速综述或下载采集结果。</p>
+        <div>
+          <h1>知网文献综述助手</h1>
+          <p>{status}</p>
+        </div>
       </header>
-
-      <section className="status-panel">
-        <span>当前状态</span>
-        <strong>{status}</strong>
-      </section>
 
       <section className="stats-grid" aria-label="采集统计">
         <div>
@@ -660,17 +657,15 @@ export function App() {
         )}
       </section>
 
-      <section className="action-section" aria-label="文献采集">
-        <h2>文献采集</h2>
-        <div className="actions">
-          <button type="button" onClick={collectAndCompleteCurrentPage}>采集当前页并补全摘要</button>
-          <button type="button" onClick={exportPackage} disabled={!hasRecords}>下载采集结果</button>
+      <section className="compact-actions" aria-label="主要操作">
+        <div className="action-row primary-row">
+          <span>采集</span>
+          <button type="button" onClick={collectAndCompleteCurrentPage}>采集当前页</button>
+          <button type="button" className="secondary" onClick={exportPackage} disabled={!hasRecords}>下载结果</button>
         </div>
-      </section>
 
-      <section className="action-section" aria-label="快速综述">
-        <h2>快速综述</h2>
-        <div className="actions">
+        <div className="action-row">
+          <span>快速</span>
           <button
             type="button"
             onClick={createQuickReview}
@@ -684,15 +679,13 @@ export function App() {
             onClick={downloadQuickReviewReport}
             disabled={!hasQuickReviewReport}
           >
-            下载快速综述报告
+            下载报告
           </button>
         </div>
-      </section>
 
-      <section className="action-section" aria-label="深度综述">
-        <h2>深度综述</h2>
-        <div className="actions">
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords}>导入全文 PDF</button>
+        <div className="action-row">
+          <span>深度</span>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords}>导入PDF</button>
           <button
             type="button"
             onClick={createDeepReview}
@@ -706,12 +699,12 @@ export function App() {
             onClick={downloadDeepReviewReport}
             disabled={!hasDeepReviewReport}
           >
-            下载深度综述报告
+            下载报告
           </button>
         </div>
       </section>
 
-      <div className="actions">
+      <div className="footer-actions">
         <button type="button" className="secondary" onClick={clearProject}>清空当前项目</button>
       </div>
       <input

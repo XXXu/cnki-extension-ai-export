@@ -62,7 +62,7 @@ describe("popup", () => {
     await waitFor(() => {
       expect(screen.getAllByText("1 篇")).toHaveLength(2);
     });
-    fireEvent.click(screen.getByText("下载采集结果"));
+    fireEvent.click(screen.getByText("下载结果"));
 
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "EXPORT_PACKAGE" }, expect.any(Function));
@@ -143,7 +143,7 @@ describe("popup", () => {
     });
     expect(await screen.findByText("快速综述已生成")).toBeTruthy();
 
-    fireEvent.click(screen.getByText("下载快速综述报告"));
+    fireEvent.click(screen.getAllByText("下载报告")[0]);
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_QUICK_REVIEW_REPORT" }, expect.any(Function));
     });
@@ -220,7 +220,7 @@ describe("popup", () => {
     });
     expect(await screen.findByText("深度综述已生成")).toBeTruthy();
 
-    fireEvent.click(screen.getByText("下载深度综述报告"));
+    fireEvent.click(screen.getAllByText("下载报告")[1]);
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith({ type: "DOWNLOAD_DEEP_REVIEW_REPORT" }, expect.any(Function));
     });
@@ -301,8 +301,8 @@ describe("popup", () => {
 
     render(<App />);
 
-    await screen.findByText("采集当前页并补全摘要");
-    fireEvent.click(screen.getByText("采集当前页并补全摘要"));
+    await screen.findByText("采集当前页");
+    fireEvent.click(screen.getByText("采集当前页"));
 
     await waitFor(() => {
       expect(sendMessage).toHaveBeenCalledWith(
@@ -354,7 +354,7 @@ describe("popup", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByText("导入全文 PDF"));
+    fireEvent.click(screen.getByText("导入PDF"));
     const input = document.querySelector("input[type='file']") as HTMLInputElement;
     const file = new File(["fake"], "党建引领基层治理的实践路径研究.pdf", { type: "application/pdf" });
     fireEvent.change(input, { target: { files: [file] } });

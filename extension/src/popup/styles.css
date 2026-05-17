@@ -6,57 +6,45 @@
 
 body {
   margin: 0;
-  min-width: 380px;
+  min-width: 400px;
 }
 
 .popup-shell {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 12px;
 }
 
 h1 {
   margin: 0;
-  font-size: 18px;
-}
-
-h2 {
-  margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 17px;
 }
 
 p {
-  margin: 6px 0 0;
+  margin: 3px 0 0;
   color: #596273;
-  line-height: 1.5;
+  line-height: 1.35;
+  font-size: 12px;
 }
 
-.status-panel,
 .stats-grid > div,
 .auth-panel,
-.action-section {
+.compact-actions {
   border: 1px solid #d9dee7;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #ffffff;
-}
-
-.status-panel {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .stats-grid > div {
   display: grid;
-  gap: 4px;
-  padding: 10px;
+  gap: 2px;
+  padding: 7px 8px;
 }
 
 .stats-grid span {
@@ -64,25 +52,26 @@ p {
   font-size: 12px;
 }
 
-.auth-panel,
-.action-section {
-  padding: 12px;
+.auth-panel {
+  padding: 8px;
 }
 
 .auth-form {
   display: grid;
-  gap: 8px;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px;
+  align-items: end;
 }
 
 .auth-form label {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   color: #657084;
   font-size: 12px;
 }
 
 input {
-  min-height: 32px;
+  min-height: 30px;
   box-sizing: border-box;
   border: 1px solid #ccd4df;
   border-radius: 6px;
@@ -93,8 +82,8 @@ input {
 .account-row,
 .inline-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1.6fr 0.7fr 0.7fr;
+  gap: 6px;
 }
 
 .account-row span {
@@ -105,20 +94,48 @@ input {
 
 .account-row strong {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
+  font-size: 13px;
 }
 
-.actions {
+.inline-actions {
+  grid-template-columns: auto auto;
+}
+
+.compact-actions {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+  padding: 8px;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.action-row.primary-row {
+  grid-template-columns: 36px 1fr 1fr;
+}
+
+.action-row > span {
+  color: #657084;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.footer-actions {
+  display: grid;
 }
 
 button {
-  min-height: 36px;
+  min-height: 32px;
   border: 0;
   border-radius: 6px;
   background: #285f8f;
   color: #ffffff;
+  font-size: 13px;
   font-weight: 600;
 }
 
