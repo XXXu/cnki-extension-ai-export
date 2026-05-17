@@ -487,6 +487,69 @@ describe("popup", () => {
     });
   });
 
+  it("采集超过 200 篇时只保存前 200 篇", async () => {
+    const savedBatches: unknown[][] = [];
+    const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_RECORDS") {
+        savedBatches.push(message.records ?? []);
+        callback({
+          ok: true,
+          count: message.records?.length ?? 0,
+          project: {
+            records: message.records,
+            failures: []
+          }
+        });
+      }
+    });
+    const query = vi.fn((_options, callback) => callback([{ id: 7 }]));
+    const executeScript = vi.fn().mockResolvedValueOnce([
+      {
+        result: {
+          records: makeRecords(201),
+          diagnostics: {
+            url: "https://kns.cnki.net/",
+            title: "知网检索页",
+            tables: 1,
+            resultTables: 1,
+            titleLinks: 201,
+            textSample: "论文列表"
+          }
+        }
+      }
+    ]);
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query,
+        sendMessage: vi.fn()
+      },
+      scripting: { executeScript }
+    });
+
+    render(<App />);
+
+    await screen.findByText("采集当前页");
+    fireEvent.click(screen.getByText("采集当前页"));
+
+    await waitFor(() => {
+      expect(savedBatches[0]).toHaveLength(200);
+    });
+    expect(savedBatches[0][0]).toEqual(expect.objectContaining({ id: "P0001" }));
+    expect(savedBatches[0][199]).toEqual(expect.objectContaining({ id: "P0200" }));
+    expect(await screen.findByText("本页超过 200 篇，已自动停止采集，只保留前 200 篇")).toBeTruthy();
+  });
+
   it("导入 PDF 全文后保存匹配记录", async () => {
     localStorage.setItem("cnkiReviewAuth", JSON.stringify({
       token: "test-token",

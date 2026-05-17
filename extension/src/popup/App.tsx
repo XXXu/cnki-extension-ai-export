@@ -48,6 +48,11 @@ type DetailFrameResult = {
   };
 };
 
+type CollectionResult = {
+  records: CnkiRecord[];
+  wasLimited: boolean;
+};
+
 const AUTH_STORAGE_KEY = "cnkiReviewAuth";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -374,7 +379,10 @@ export function App() {
       records = response.records ?? [];
     }
 
-    return records;
+    return {
+      records: records.slice(0, QUICK_REVIEW_MAX_PAPERS),
+      wasLimited: records.length > QUICK_REVIEW_MAX_PAPERS
+    };
   }
 
   async function completePendingRecords(pending: CnkiRecord[]) {
@@ -422,14 +430,17 @@ export function App() {
   }
 
   async function collectAndCompleteCurrentPage() {
-    const records = await collectRecordsFromCurrentPage();
-    if (!records) return;
+    const collection = await collectRecordsFromCurrentPage();
+    if (!collection) return;
 
+    const { records, wasLimited } = collection;
     await sendRuntimeMessage({ type: "SAVE_RECORDS", records });
     const pending = records.filter((record) => record.detailUrl && record.status !== "complete");
     if (pending.length === 0) {
       await refresh();
-      setStatus(`已采集 ${records.length} 篇，但没有可补全链接`);
+      setStatus(wasLimited
+        ? `本页超过 ${QUICK_REVIEW_MAX_PAPERS} 篇，已自动停止采集，只保留前 ${QUICK_REVIEW_MAX_PAPERS} 篇`
+        : `已采集 ${records.length} 篇，但没有可补全链接`);
       return;
     }
 
@@ -439,7 +450,9 @@ export function App() {
       await sendRuntimeMessage({ type: "SAVE_RECORDS", records: completed });
     }
     await refresh();
-    setStatus(`已采集 ${records.length} 篇，已补全 ${completed.length} 篇，失败 ${failed} 篇`);
+    setStatus(wasLimited
+      ? `已采集前 ${records.length} 篇，已补全 ${completed.length} 篇，失败 ${failed} 篇。本页超过 ${QUICK_REVIEW_MAX_PAPERS} 篇，已自动停止采集`
+      : `已采集 ${records.length} 篇，已补全 ${completed.length} 篇，失败 ${failed} 篇`);
   }
 
   async function exportPackage() {
