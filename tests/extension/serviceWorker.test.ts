@@ -60,6 +60,28 @@ describe("service worker messages", () => {
     expect(response).toEqual({ ok: false, error: "尚未生成快速综述报告" });
   });
 
+  it("下载快速综述报告时生成 Word 文档", async () => {
+    const loadProject = vi.fn().mockResolvedValue({
+      ...project,
+      quickReviewReport: {
+        content: "# 快速综述\n\n这是一段报告正文。",
+        generatedAt: "2026-05-17T00:00:00.000Z"
+      }
+    });
+    const downloadWordFile = vi.fn().mockResolvedValue(undefined);
+    const response = await handleRuntimeMessage(
+      { type: "DOWNLOAD_QUICK_REVIEW_REPORT" },
+      { loadProject, downloadWordFile } as never
+    );
+
+    expect(downloadWordFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^cnki-quick-review-\d+\.doc$/),
+      "知网快速综述报告",
+      "# 快速综述\n\n这是一段报告正文。"
+    );
+    expect(response).toEqual({ ok: true });
+  });
+
   it("保存深度综述报告", async () => {
     const saveProject = vi.fn(async (nextProject: ProjectState) => nextProject);
     const loadProject = vi.fn().mockResolvedValue(project);
@@ -84,5 +106,27 @@ describe("service worker messages", () => {
     );
 
     expect(response).toEqual({ ok: false, error: "尚未生成深度综述报告" });
+  });
+
+  it("下载深度综述报告时生成 Word 文档", async () => {
+    const loadProject = vi.fn().mockResolvedValue({
+      ...project,
+      deepReviewReport: {
+        content: "# 深度综述\n\n这是一段报告正文。",
+        generatedAt: "2026-05-17T00:00:00.000Z"
+      }
+    });
+    const downloadWordFile = vi.fn().mockResolvedValue(undefined);
+    const response = await handleRuntimeMessage(
+      { type: "DOWNLOAD_DEEP_REVIEW_REPORT" },
+      { loadProject, downloadWordFile } as never
+    );
+
+    expect(downloadWordFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^cnki-deep-review-\d+\.doc$/),
+      "知网深度综述报告",
+      "# 深度综述\n\n这是一段报告正文。"
+    );
+    expect(response).toEqual({ ok: true });
   });
 });

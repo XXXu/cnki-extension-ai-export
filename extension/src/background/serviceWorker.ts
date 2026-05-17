@@ -19,6 +19,7 @@ type Dependencies = Partial<{
   saveProject: typeof saveProject;
   downloadZip: typeof downloadZip;
   downloadTextFile: typeof downloadTextFile;
+  downloadWordFile: typeof downloadWordFile;
 }>;
 
 export async function downloadZip(project: ProjectState) {
@@ -44,6 +45,57 @@ export async function downloadTextFile(filename: string, content: string) {
   });
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function markdownToWordHtml(markdown: string) {
+  return markdown
+    .split(/\r?\n/)
+    .map((line) => {
+      const text = line.trim();
+      if (!text) return "";
+      if (text.startsWith("### ")) return `<h3>${escapeHtml(text.slice(4))}</h3>`;
+      if (text.startsWith("## ")) return `<h2>${escapeHtml(text.slice(3))}</h2>`;
+      if (text.startsWith("# ")) return `<h1>${escapeHtml(text.slice(2))}</h1>`;
+      if (/^[-*]\s+/.test(text)) return `<p>• ${escapeHtml(text.replace(/^[-*]\s+/, ""))}</p>`;
+      if (/^\d+\.\s+/.test(text)) return `<p>${escapeHtml(text)}</p>`;
+      return `<p>${escapeHtml(text)}</p>`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+export async function downloadWordFile(filename: string, title: string, markdown: string) {
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: "Microsoft YaHei", SimSun, Arial, sans-serif; line-height: 1.7; color: #1f2933; }
+    h1 { font-size: 22pt; margin: 0 0 18pt; }
+    h2 { font-size: 16pt; margin: 18pt 0 8pt; }
+    h3 { font-size: 13pt; margin: 14pt 0 6pt; }
+    p { font-size: 11pt; margin: 0 0 8pt; }
+  </style>
+</head>
+<body>
+${markdownToWordHtml(markdown)}
+</body>
+</html>`;
+
+  await chrome.downloads.download({
+    url: `data:application/msword;charset=utf-8,${encodeURIComponent(html)}`,
+    filename,
+    saveAs: true
+  });
+}
+
 export async function handleRuntimeMessage(message: RuntimeMessage, deps: Dependencies = {}) {
   const services = {
     appendRecords,
@@ -51,6 +103,7 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
     saveProject,
     downloadZip,
     downloadTextFile,
+    downloadWordFile,
     ...deps
   };
 
@@ -93,8 +146,9 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
       return { ok: false, error: "尚未生成快速综述报告" };
     }
 
-    await services.downloadTextFile(
-      `cnki-quick-review-${Date.now()}.md`,
+    await services.downloadWordFile(
+      `cnki-quick-review-${Date.now()}.doc`,
+      "知网快速综述报告",
       project.quickReviewReport.content
     );
     return { ok: true };
@@ -118,8 +172,9 @@ export async function handleRuntimeMessage(message: RuntimeMessage, deps: Depend
       return { ok: false, error: "尚未生成深度综述报告" };
     }
 
-    await services.downloadTextFile(
-      `cnki-deep-review-${Date.now()}.md`,
+    await services.downloadWordFile(
+      `cnki-deep-review-${Date.now()}.doc`,
+      "知网深度综述报告",
       project.deepReviewReport.content
     );
     return { ok: true };
