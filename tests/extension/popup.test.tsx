@@ -322,6 +322,15 @@ describe("popup", () => {
   });
 
   it("导入 PDF 全文后保存匹配记录", async () => {
+    localStorage.setItem("cnkiReviewAuth", JSON.stringify({
+      token: "test-token",
+      user: {
+        id: "u1",
+        email: "student@example.com",
+        quickReviewQuota: 2,
+        deepReviewQuota: 1
+      }
+    }));
     const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
       if (message.type === "GET_PROJECT") {
         callback({
@@ -374,5 +383,31 @@ describe("popup", () => {
       );
     });
     expect(await screen.findByText("已读取 1 个 PDF，匹配 1 篇，未匹配 0 个，失败 0 个")).toBeTruthy();
+  });
+
+  it("未登录时禁止导入 PDF", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [listOnlyRecord],
+            failures: []
+          }
+        });
+      }
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    expect((await screen.findByText("导入PDF") as HTMLButtonElement).disabled).toBe(true);
   });
 });

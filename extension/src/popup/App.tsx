@@ -685,7 +685,7 @@ export function App() {
 
         <div className="action-row deep-row">
           <span>深度</span>
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords}>导入PDF</button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!hasRecords || !auth}>导入PDF</button>
           <button
             type="button"
             onClick={createDeepReview}
