@@ -29,7 +29,14 @@ type ApiErrorBody = {
 async function readError(response: Response) {
   try {
     const body = await response.json() as ApiErrorBody;
-    return body.error ?? body.message ?? `HTTP_${response.status}`;
+    const error = body.error ?? body.message ?? `HTTP_${response.status}`;
+    if (error === "INVALID_REQUEST") return "邮箱格式不正确或密码少于 8 位";
+    if (error === "EMAIL_ALREADY_REGISTERED") return "该邮箱已注册，请直接登录";
+    if (error === "INVALID_CREDENTIALS") return "邮箱或密码不正确";
+    if (error === "UNAUTHORIZED") return "登录已失效，请重新登录";
+    if (error === "QUICK_REVIEW_QUOTA_EXHAUSTED") return "快速综述次数已用完";
+    if (error === "DEEP_REVIEW_QUOTA_EXHAUSTED") return "深度综述次数已用完";
+    return error;
   } catch {
     return `HTTP_${response.status}`;
   }

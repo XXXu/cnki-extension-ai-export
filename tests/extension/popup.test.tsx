@@ -149,6 +149,72 @@ describe("popup", () => {
     });
   });
 
+  it("注册前校验邮箱格式", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+    });
+    const fetch = vi.fn();
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "xiao930822@163" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "password123" } });
+    fireEvent.click(screen.getByText("注册"));
+
+    expect(await screen.findByText("邮箱格式不正确，请填写完整邮箱")).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("注册前校验密码长度", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+    });
+    const fetch = vi.fn();
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "student@example.com" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByText("注册"));
+
+    expect(await screen.findByText("密码至少需要 8 位")).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("导入全文后生成深度综述并启用报告下载", async () => {
     const matchedRecord = {
       ...listOnlyRecord,

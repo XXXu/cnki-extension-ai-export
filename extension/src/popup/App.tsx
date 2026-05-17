@@ -48,6 +48,7 @@ type DetailFrameResult = {
 };
 
 const AUTH_STORAGE_KEY = "cnkiReviewAuth";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function sendRuntimeMessage<T>(message: object): Promise<RuntimeResponse<T>> {
   return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
@@ -317,16 +318,25 @@ export function App() {
   }
 
   async function handleAuth(mode: "login" | "register") {
-    if (!email || !password) {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
       setStatus("请填写邮箱和密码");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setStatus("邮箱格式不正确，请填写完整邮箱");
+      return;
+    }
+    if (password.length < 8) {
+      setStatus("密码至少需要 8 位");
       return;
     }
 
     try {
       setStatus(mode === "login" ? "正在登录" : "正在注册");
       const session = mode === "login"
-        ? await login(email, password)
-        : await register(email, password);
+        ? await login(normalizedEmail, password)
+        : await register(normalizedEmail, password);
       setAuth(session);
       saveAuthSession(session);
       setStatus(mode === "login" ? "登录成功" : "注册成功");
