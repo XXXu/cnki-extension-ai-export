@@ -40,19 +40,16 @@ describe("AI export builders", () => {
 
   it("生成 CSV 和中文说明", () => {
     expect(buildCsv([record])).toContain("ID,题名,作者");
-    expect(buildReadme()).toContain("先使用 01_快速摘要分析包");
+    expect(buildReadme()).toContain("快速综述材料");
   });
 
   it("生成完整导出文件清单", () => {
     const files = buildExportFiles([record], 1);
 
     expect(files.map((file) => file.filename)).toEqual([
-      "01_快速摘要分析包/fast_batch_001.md",
-      "01_快速摘要分析包提示词.md",
-      "02_全文增强分析包/enhance_batch_001.md",
-      "02_全文增强分析包提示词.md",
-      "papers.csv",
-      "README.md"
+      "快速综述材料/第001批.md",
+      "知网文献列表.csv",
+      "使用说明.txt"
     ]);
   });
 
@@ -72,7 +69,7 @@ describe("AI export builders", () => {
     expect(batches[0].content).toContain("摘要：构建具有中国特色的村集体经济组织治理体系。");
     expect(batches[0].content).toContain("关键词：集体经济组织；党建引领");
     expect(batches[0].content).toContain("全文切片");
-    expect(files.map((file) => file.filename)).toContain("02_全文增强分析包/enhance_batch_001.md");
+    expect(files.map((file) => file.filename)).not.toContain("02_全文增强分析包/enhance_batch_001.md");
   });
 
   it("全文增强批次中没有全文的论文标明未导入", () => {

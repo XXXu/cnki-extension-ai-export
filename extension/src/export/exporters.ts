@@ -87,9 +87,16 @@ export function buildBatches(records: CnkiRecord[], batchSize = 100) {
   const batches: Array<{ filename: string; content: string }> = [];
   for (let index = 0; index < records.length; index += batchSize) {
     const batchNumber = String(batches.length + 1).padStart(3, "0");
+    const batchRecords = records.slice(index, index + batchSize);
     batches.push({
-      filename: `01_快速摘要分析包/fast_batch_${batchNumber}.md`,
-      content: buildAiMarkdown(records.slice(index, index + batchSize))
+      filename: `快速综述材料/第${batchNumber}批.md`,
+      content: [
+        buildAnalysisPrompt(),
+        "",
+        "---",
+        "",
+        buildAiMarkdown(batchRecords)
+      ].join("\n")
     });
   }
   return batches;
@@ -277,22 +284,20 @@ export function buildFullTextMergePrompt() {
 
 export function buildReadme() {
   return [
-    "# 知网 AI 分析包使用说明",
+    "知网文献综述材料包使用说明",
     "",
-    "## 文件结构",
+    "文件结构：",
     "",
-    "- `01_快速摘要分析包/`：摘要级批次文件，文件名为 `fast_batch_xxx.md`。",
-    "- `01_快速摘要分析包提示词.md`：配合快速摘要分析包使用。",
-    "- `02_全文增强分析包/`：全文增强批次文件，文件名为 `enhance_batch_xxx.md`。",
-    "- `02_全文增强分析包提示词.md`：配合全文增强分析包使用。",
-    "- `papers.csv`：全部论文的结构化表格。",
+    "1. 快速综述材料：给 DeepSeek、ChatGPT 等 AI 网页上传或粘贴使用，材料里已经包含分析要求。",
+    "2. 知网文献列表.csv：全部采集论文的表格，包含论文ID、题名、作者、来源、摘要、关键词等信息。",
+    "3. 使用说明.txt：当前说明文件。",
     "",
-    "## 建议用法",
+    "建议用法：",
     "",
-    "1. 如果只需要快速判断整体研究格局，先使用 01_快速摘要分析包。",
-    "2. 如果已经导入 PDF 全文，优先使用 02_全文增强分析包。",
-    "3. 全文增强包中，有全文的论文优先依据全文分析；没有全文的论文只做摘要级判断。",
-    "4. 分批分析后，把各批次结果合并，让 AI 形成最终文献综述判断。"
+    "1. 打开 DeepSeek 或 ChatGPT 网页。",
+    "2. 上传或复制“快速综述材料”文件夹中的批次文件。",
+    "3. 如果文件较多，可以逐批分析，再把各批次结论合并。",
+    "4. AI 输出中提到的论文ID，可以回到“知网文献列表.csv”中核对具体论文。"
   ].join("\n");
 }
 
@@ -303,14 +308,7 @@ export function buildExportFiles(records: CnkiRecord[], batchSize = 100): Export
       content: batch.content,
       mimeType: "text/markdown;charset=utf-8"
     })),
-    { filename: "01_快速摘要分析包提示词.md", content: buildAnalysisPrompt(), mimeType: "text/markdown;charset=utf-8" },
-    ...buildFullTextEnhancedBatches(records).map((batch) => ({
-      filename: batch.filename,
-      content: batch.content,
-      mimeType: "text/markdown;charset=utf-8"
-    })),
-    { filename: "02_全文增强分析包提示词.md", content: buildFullTextMergePrompt(), mimeType: "text/markdown;charset=utf-8" },
-    { filename: "papers.csv", content: buildCsv(records), mimeType: "text/csv;charset=utf-8" },
-    { filename: "README.md", content: buildReadme(), mimeType: "text/markdown;charset=utf-8" }
+    { filename: "知网文献列表.csv", content: buildCsv(records), mimeType: "text/csv;charset=utf-8" },
+    { filename: "使用说明.txt", content: buildReadme(), mimeType: "text/plain;charset=utf-8" }
   ];
 }
