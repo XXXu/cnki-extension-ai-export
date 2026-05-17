@@ -643,11 +643,11 @@ export function App() {
               <strong>{auth.user.email}</strong>
             </div>
             <div>
-              <span>快速综述</span>
+              <span>剩余快速</span>
               <strong>{auth.user.quickReviewQuota} 次</strong>
             </div>
             <div>
-              <span>深度综述</span>
+              <span>剩余深度</span>
               <strong>{auth.user.deepReviewQuota} 次</strong>
             </div>
           </div>
