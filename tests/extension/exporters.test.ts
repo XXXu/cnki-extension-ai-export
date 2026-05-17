@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAiMarkdown,
+  buildAnalysisPrompt,
   buildCsv,
   buildExportFiles,
   buildFullTextEnhancedBatches,
@@ -41,6 +42,15 @@ describe("AI export builders", () => {
   it("生成 CSV 和中文说明", () => {
     expect(buildCsv([record])).toContain("ID,题名,作者");
     expect(buildReadme()).toContain("快速综述材料");
+  });
+
+  it("快速综述提示词限定为摘要级分析", () => {
+    const prompt = buildAnalysisPrompt();
+
+    expect(prompt).toContain("论文题录、摘要和关键词");
+    expect(prompt).toContain("不要推断论文的研究方法、论证过程、数据来源或材料细节");
+    expect(prompt).not.toContain("可用全文");
+    expect(prompt).not.toContain("有全文的论文优先依据全文判断");
   });
 
   it("生成完整导出文件清单", () => {
