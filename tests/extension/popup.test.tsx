@@ -164,6 +164,55 @@ describe("popup", () => {
     });
   });
 
+  it("登录后可以退出账号且不清空当前信息", async () => {
+    localStorage.setItem("cnkiReviewAuth", JSON.stringify({
+      token: "test-token",
+      user: {
+        id: "u1",
+        email: "student@example.com",
+        quickReviewQuota: 3,
+        deepReviewQuota: 1
+      }
+    }));
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [{
+              ...listOnlyRecord,
+              abstract: "这是一段摘要。",
+              status: "complete"
+            }],
+            failures: []
+          }
+        });
+      }
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("student@example.com")).toBeTruthy();
+    expect(screen.getAllByText("1 篇")).toHaveLength(2);
+
+    fireEvent.click(screen.getByText("退出"));
+
+    expect(localStorage.getItem("cnkiReviewAuth")).toBeNull();
+    expect(await screen.findByText("已退出登录")).toBeTruthy();
+    expect(screen.getByLabelText("邮箱")).toBeTruthy();
+    expect(screen.getByLabelText("密码")).toBeTruthy();
+    expect(screen.getAllByText("1 篇")).toHaveLength(2);
+    expect(sendMessage).not.toHaveBeenCalledWith({ type: "CLEAR_PROJECT" }, expect.any(Function));
+  });
+
   it("快速综述超过 200 篇时不发起请求", async () => {
     localStorage.setItem("cnkiReviewAuth", JSON.stringify({
       token: "test-token",

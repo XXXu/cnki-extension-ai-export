@@ -355,6 +355,14 @@ export function App() {
     }
   }
 
+  function handleLogout() {
+    setAuth(null);
+    saveAuthSession(null);
+    setEmail("");
+    setPassword("");
+    setStatus("已退出登录");
+  }
+
   async function collectRecordsFromCurrentPage() {
     setStatus("正在采集当前页");
     const tab = await queryActiveTab();
@@ -714,6 +722,7 @@ export function App() {
               <span>剩余深度</span>
               <strong>{auth.user.deepReviewQuota} 次</strong>
             </div>
+            <button type="button" className="secondary" onClick={handleLogout}>退出</button>
           </div>
         ) : (
           <div className="auth-form">
