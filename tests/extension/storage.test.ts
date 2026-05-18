@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { QUICK_REVIEW_MAX_PAPERS } from "../../extension/src/shared/reviewLimits";
 import { mergeRecords } from "../../extension/src/background/storage";
 import type { CnkiRecord } from "../../extension/src/shared/types";
 
@@ -21,6 +22,18 @@ const baseRecord: CnkiRecord = {
   collectedAt: "2026-05-04T00:00:00.000Z",
   status: "list-only"
 };
+
+function makeRecords(count: number, offset = 0) {
+  return Array.from({ length: count }, (_, index) => {
+    const id = offset + index + 1;
+    return {
+      ...baseRecord,
+      id: `P${String(id).padStart(4, "0")}`,
+      title: `测试论文 ${id}`,
+      detailUrl: `https://example.com/detail-${id}`
+    };
+  });
+}
 
 describe("mergeRecords", () => {
   it("按详情页链接去重，并保留已经补全的详情字段", () => {
@@ -96,5 +109,27 @@ describe("mergeRecords", () => {
     expect(merged[0].fullTextFileName).toBe("测试论文.pdf");
     expect(merged[0].fullTextMatchScore).toBe(0.96);
     expect(merged[0].fullTextStatus).toBe("matched");
+  });
+
+  it("合并后最多保留 200 篇论文", () => {
+    const merged = mergeRecords(makeRecords(20), makeRecords(200, 20));
+
+    expect(merged).toHaveLength(QUICK_REVIEW_MAX_PAPERS);
+    expect(merged[0].id).toBe("P0001");
+    expect(merged[199].id).toBe("P0200");
+  });
+
+  it("合并时清理被误存为摘要的正文快照", () => {
+    const existing = [{
+      ...baseRecord,
+      abstract: "正文快照：全省4.6万个村党组织成为促振兴、保平安的桥头堡。",
+      status: "complete" as const
+    }];
+    const incoming = [{ ...baseRecord, abstract: "", status: "partial" as const }];
+
+    const merged = mergeRecords(existing, incoming);
+
+    expect(merged[0].abstract).toBe("");
+    expect(merged[0].status).toBe("complete");
   });
 });

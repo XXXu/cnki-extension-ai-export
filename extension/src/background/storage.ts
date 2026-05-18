@@ -1,4 +1,6 @@
 import type { CnkiRecord, ProjectState } from "../shared/types";
+import { cleanAbstract } from "../shared/abstract";
+import { QUICK_REVIEW_MAX_PAPERS } from "../shared/reviewLimits";
 import { recordKey } from "../shared/normalize";
 
 export const STORAGE_KEY = "cnkiProject";
@@ -15,13 +17,15 @@ export function createEmptyProject(): ProjectState {
 }
 
 function keepBestRecord(prior: CnkiRecord, incoming: CnkiRecord): CnkiRecord {
+  const priorAbstract = cleanAbstract(prior.abstract);
+  const incomingAbstract = cleanAbstract(incoming.abstract);
   return {
     ...prior,
     ...incoming,
     id: prior.id,
     title: prior.title || incoming.title,
     authors: prior.authors.length > 0 ? prior.authors : incoming.authors,
-    abstract: prior.abstract || incoming.abstract,
+    abstract: priorAbstract || incomingAbstract,
     keywords: prior.keywords.length > 0 ? prior.keywords : incoming.keywords,
     funding: prior.funding || incoming.funding,
     album: prior.album || incoming.album,
@@ -57,16 +61,24 @@ export function mergeRecords(existing: CnkiRecord[], incoming: CnkiRecord[]) {
     });
   }
 
-  return Array.from(byKey.values());
+  return Array.from(byKey.values()).slice(0, QUICK_REVIEW_MAX_PAPERS);
 }
 
 export async function loadProject(): Promise<ProjectState> {
   const result = await chrome.storage.local.get(STORAGE_KEY);
-  return result[STORAGE_KEY] ?? createEmptyProject();
+  const project = result[STORAGE_KEY] ?? createEmptyProject();
+  return {
+    ...project,
+    records: (project.records ?? []).slice(0, QUICK_REVIEW_MAX_PAPERS)
+  };
 }
 
 export async function saveProject(project: ProjectState) {
-  const next = { ...project, updatedAt: new Date().toISOString() };
+  const next = {
+    ...project,
+    records: (project.records ?? []).slice(0, QUICK_REVIEW_MAX_PAPERS),
+    updatedAt: new Date().toISOString()
+  };
   await chrome.storage.local.set({ [STORAGE_KEY]: next });
   return next;
 }

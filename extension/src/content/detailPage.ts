@@ -1,4 +1,5 @@
 import { cleanText, splitAuthors } from "../shared/normalize";
+import { cleanAbstract } from "../shared/abstract";
 
 export type DetailFields = {
   title: string;
@@ -62,13 +63,13 @@ export function parseDetailPage(doc: Document): DetailFields {
 
   const abstractLabels = ["摘要", "Abstract"];
   const keywordLabels = ["关键词", "关键字", "Keywords", "Key words"];
-  const abstractText = cleanText(doc.querySelector(".abstract")?.textContent) || findTextByLabels(doc, abstractLabels);
+  const abstractText = cleanAbstract(cleanText(doc.querySelector(".abstract")?.textContent) || findTextByLabels(doc, abstractLabels));
   const keywordText = cleanText(doc.querySelector(".keywords")?.textContent) || findTextByLabels(doc, keywordLabels);
 
   return {
     title,
     authors,
-    abstract: removeLabel(abstractText, abstractLabels),
+    abstract: cleanAbstract(removeLabel(abstractText, abstractLabels)),
     keywords: splitKeywords(removeLabel(keywordText, keywordLabels)),
     funding: textAfterStrong(doc, ["基金资助", "基金", "Funding", "Fund"]),
     album: textAfterStrong(doc, ["专辑"]),

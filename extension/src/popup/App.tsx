@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { generateDeepReview, generateQuickReview, login, register, type AuthSession } from "./api";
 import { matchFullTextToRecord } from "../fulltext/fullText";
+import { cleanAbstract, isUsableAbstract } from "../shared/abstract";
 import { DEEP_REVIEW_MAX_PAPERS, QUICK_REVIEW_MAX_PAPERS } from "../shared/reviewLimits";
 import type { CnkiRecord } from "../shared/types";
 
@@ -184,7 +185,7 @@ async function collectFromAllFrames(tabId: number) {
   };
 }
 
-function extractCnkiDetailFromFrame(): DetailFrameResult {
+export function extractCnkiDetailFromFrame(): DetailFrameResult {
   const cleanText = (value: string | null | undefined) => (value ?? "").replace(/\s+/g, " ").trim();
   const splitList = (value: string) => cleanText(value)
     .replace(/^(关键词|关键字|摘要|Keywords|Key words|Abstract)[:：]\s*/i, "")
@@ -233,10 +234,10 @@ function extractCnkiDetailFromFrame(): DetailFrameResult {
   const authors = authorLinks.map((node) => cleanText(node.textContent)).filter(Boolean);
   const abstractLabels = ["摘要", "Abstract"];
   const keywordLabels = ["关键词", "关键字", "Keywords", "Key words"];
-  const abstract = removeLabel(
+  const abstract = cleanAbstract(removeLabel(
     textBySelector([".abstract", "#ChDivSummary", "[id*='Summary']", "[class*='abstract']"]) || textByLabel(abstractLabels),
     abstractLabels
-  );
+  ));
   const keywordText = textBySelector([".keywords", "#ChDivKeyWord", "[id*='KeyWord']", "[class*='keyword']"]) || textByLabel(keywordLabels);
   const keywords = splitList(keywordText);
 
@@ -304,8 +305,11 @@ export function App() {
   const [auth, setAuth] = useState<AuthSession | null>(() => loadAuthSession());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isCollecting, setIsCollecting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const completeCount = project.records.filter((record) => record.status === "complete").length;
+  const isCollectingRef = useRef(false);
+  const abstractCount = project.records.filter((record) => isUsableAbstract(record.abstract)).length;
+  const missingAbstractCount = project.records.filter((record) => !isUsableAbstract(record.abstract)).length + project.failures.length;
   const fullTextCount = project.records.filter((record) => Boolean(record.fullText)).length;
   const hasRecords = project.records.length > 0;
   const hasQuickReviewReport = Boolean(project.quickReviewReport?.content);
@@ -387,6 +391,8 @@ export function App() {
 
   async function completePendingRecords(pending: CnkiRecord[]) {
     const completed: CnkiRecord[] = [];
+    const partialRecords: CnkiRecord[] = [];
+    const failedRecords: CnkiRecord[] = [];
     let failed = 0;
 
     for (let index = 0; index < pending.length; index += 1) {
@@ -402,57 +408,93 @@ export function App() {
         }
         const result = await extractDetailFromTab(tabId);
         const detail = result?.detail ?? {};
-        if (!detail.abstract && (!detail.keywords || detail.keywords.length === 0)) {
+        const abstract = cleanAbstract(detail.abstract);
+        const keywords = detail.keywords && detail.keywords.length > 0 ? detail.keywords : record.keywords;
+        if (!abstract && keywords.length === 0) {
           throw new Error("详情页未识别到摘要或关键词");
         }
 
-        completed.push({
+        const nextRecord = {
           ...record,
           title: detail.title || record.title,
           authors: detail.authors && detail.authors.length > 0 ? detail.authors : record.authors,
-          abstract: detail.abstract || record.abstract,
-          keywords: detail.keywords && detail.keywords.length > 0 ? detail.keywords : record.keywords,
+          abstract,
+          keywords,
           funding: detail.funding || record.funding,
           album: detail.album || record.album,
           topic: detail.topic || record.topic,
           classification: detail.classification || record.classification,
-          collectedAt: new Date().toISOString(),
+          collectedAt: new Date().toISOString()
+        };
+
+        if (!abstract) {
+          partialRecords.push({
+            ...nextRecord,
+            status: "partial",
+            error: "详情页未提供摘要"
+          });
+          continue;
+        }
+
+        completed.push({
+          ...nextRecord,
           status: "complete"
         });
-      } catch {
+      } catch (error) {
         failed += 1;
+        failedRecords.push({
+          ...record,
+          collectedAt: new Date().toISOString(),
+          status: "failed",
+          error: error instanceof Error ? error.message : "详情页补全失败"
+        });
       } finally {
         if (tabId) await closeTab(tabId);
       }
     }
 
-    return { completed, failed };
+    return { completed, partialRecords, failed, failedRecords };
   }
 
   async function collectAndCompleteCurrentPage() {
-    const collection = await collectRecordsFromCurrentPage();
-    if (!collection) return;
-
-    const { records, wasLimited } = collection;
-    await sendRuntimeMessage({ type: "SAVE_RECORDS", records });
-    const pending = records.filter((record) => record.detailUrl && record.status !== "complete");
-    if (pending.length === 0) {
-      await refresh();
-      setStatus(wasLimited
-        ? `本页超过 ${QUICK_REVIEW_MAX_PAPERS} 篇，已自动停止采集，只保留前 ${QUICK_REVIEW_MAX_PAPERS} 篇`
-        : `已采集 ${records.length} 篇，但没有可补全链接`);
+    if (isCollectingRef.current) return;
+    if (project.records.length >= QUICK_REVIEW_MAX_PAPERS) {
+      setStatus(`当前信息已达 ${QUICK_REVIEW_MAX_PAPERS} 篇上限，请先清空当前信息后再采集`);
       return;
     }
+    isCollectingRef.current = true;
+    setIsCollecting(true);
 
-    setStatus(`已采集 ${records.length} 篇，正在补全摘要和关键词`);
-    const { completed, failed } = await completePendingRecords(pending);
-    if (completed.length > 0) {
-      await sendRuntimeMessage({ type: "SAVE_RECORDS", records: completed });
+    try {
+      const collection = await collectRecordsFromCurrentPage();
+      if (!collection) return;
+
+      const { records, wasLimited } = collection;
+      await sendRuntimeMessage({ type: "SAVE_RECORDS", records });
+      const pending = records.filter((record) => record.detailUrl && record.status !== "complete");
+      if (pending.length === 0) {
+        await refresh();
+        setStatus(wasLimited
+          ? `本页超过 ${QUICK_REVIEW_MAX_PAPERS} 篇，已自动停止采集，只保留前 ${QUICK_REVIEW_MAX_PAPERS} 篇`
+          : `已采集 ${records.length} 篇，但没有可补全链接`);
+        return;
+      }
+
+      setStatus(`已采集 ${records.length} 篇，正在补全摘要和关键词`);
+      const { completed, partialRecords, failed, failedRecords } = await completePendingRecords(pending);
+      const missingAbstract = partialRecords.length + failed;
+      const detailRecords = [...completed, ...partialRecords, ...failedRecords];
+      if (detailRecords.length > 0) {
+        await sendRuntimeMessage({ type: "SAVE_RECORDS", records: detailRecords });
+      }
+      await refresh();
+      setStatus(wasLimited
+        ? `已采集前 ${records.length} 篇，已补摘要 ${completed.length} 篇，未补摘要 ${missingAbstract} 篇。本页超过 ${QUICK_REVIEW_MAX_PAPERS} 篇，已自动停止采集`
+        : `已采集 ${records.length} 篇，已补摘要 ${completed.length} 篇，未补摘要 ${missingAbstract} 篇`);
+    } finally {
+      isCollectingRef.current = false;
+      setIsCollecting(false);
     }
-    await refresh();
-    setStatus(wasLimited
-      ? `已采集前 ${records.length} 篇，已补全 ${completed.length} 篇，失败 ${failed} 篇。本页超过 ${QUICK_REVIEW_MAX_PAPERS} 篇，已自动停止采集`
-      : `已采集 ${records.length} 篇，已补全 ${completed.length} 篇，失败 ${failed} 篇`);
   }
 
   async function exportPackage() {
@@ -645,11 +687,11 @@ export function App() {
         </div>
         <div>
           <span>已补摘要</span>
-          <strong>{completeCount} 篇</strong>
+          <strong>{abstractCount} 篇</strong>
         </div>
         <div>
-          <span>失败</span>
-          <strong>{project.failures.length} 篇</strong>
+          <span>未补摘要</span>
+          <strong>{missingAbstractCount} 篇</strong>
         </div>
         <div>
           <span>已导PDF</span>
@@ -694,7 +736,7 @@ export function App() {
       <section className="compact-actions" aria-label="主要操作">
         <div className="action-row primary-row">
           <span>采集</span>
-          <button type="button" onClick={collectAndCompleteCurrentPage}>采集当前页</button>
+          <button type="button" onClick={collectAndCompleteCurrentPage} disabled={isCollecting}>采集当前页</button>
           <button type="button" className="secondary" onClick={exportPackage} disabled={!hasRecords}>下载报告</button>
         </div>
 

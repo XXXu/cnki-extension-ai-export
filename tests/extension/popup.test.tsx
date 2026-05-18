@@ -5,7 +5,7 @@ vi.mock("../../extension/src/fulltext/pdfText", () => ({
   extractPdfText: vi.fn(async () => "党建引领基层治理的实践路径研究 张三 这是一段 PDF 全文。")
 }));
 
-import { App } from "../../extension/src/popup/App";
+import { App, extractCnkiDetailFromFrame } from "../../extension/src/popup/App";
 
 const listOnlyRecord = {
   id: "P0001",
@@ -481,10 +481,257 @@ describe("popup", () => {
         expect.any(Function)
       );
     });
-    expect(await screen.findByText("已采集 1 篇，已补全 1 篇，失败 0 篇")).toBeTruthy();
+    expect(await screen.findByText("已采集 1 篇，已补摘要 1 篇，未补摘要 0 篇")).toBeTruthy();
     await waitFor(() => {
       expect(remove).toHaveBeenCalledWith(88, expect.any(Function));
     });
+  });
+
+  it("采集过程中禁用采集按钮，避免重复触发", async () => {
+    let resolveQuery: ((tabs: Array<{ id: number }>) => void) | undefined;
+    const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+    });
+    const query = vi.fn((_options, callback) => {
+      resolveQuery = callback;
+    });
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query,
+        sendMessage: vi.fn()
+      },
+      scripting: { executeScript: vi.fn() }
+    });
+
+    render(<App />);
+
+    const button = await screen.findByText("采集当前页") as HTMLButtonElement;
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(button.disabled).toBe(true);
+    expect(query).toHaveBeenCalledTimes(1);
+
+    resolveQuery?.([]);
+    expect(await screen.findByText("未找到当前标签页")).toBeTruthy();
+    expect(button.disabled).toBe(false);
+  });
+
+  it("当前信息已满 200 篇时不再采集当前页", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: makeRecords(200),
+            failures: []
+          }
+        });
+      }
+    });
+    const query = vi.fn();
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query,
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    await screen.findAllByText("200 篇");
+    fireEvent.click(screen.getByText("采集当前页"));
+
+    expect(await screen.findByText("当前信息已达 200 篇上限，请先清空当前信息后再采集")).toBeTruthy();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("详情页未识别到摘要时保存失败状态并显示未补摘要统计", async () => {
+    let projectRecords: unknown[] = [];
+    const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: projectRecords,
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_RECORDS") {
+        projectRecords = message.records ?? [];
+        callback({
+          ok: true,
+          count: projectRecords.length,
+          project: {
+            records: projectRecords,
+            failures: []
+          }
+        });
+      }
+    });
+    const query = vi.fn((_options, callback) => callback([{ id: 7 }]));
+    const create = vi.fn((_options, callback) => callback({ id: 88, status: "complete" }));
+    const remove = vi.fn((_tabId, callback) => callback?.());
+    const addListener = vi.fn();
+    const removeListener = vi.fn();
+    const executeScript = vi.fn()
+      .mockResolvedValueOnce([
+        {
+          result: {
+            records: [listOnlyRecord],
+            diagnostics: {
+              url: "https://kns.cnki.net/",
+              title: "知网检索页",
+              tables: 1,
+              resultTables: 1,
+              titleLinks: 1,
+              textSample: "论文列表"
+            }
+          }
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          result: {
+            detail: {
+              title: "党建引领基层治理的实践路径研究",
+              authors: [],
+              abstract: "",
+              keywords: []
+            },
+            diagnostics: { title: "详情页", abstractLength: 0, keywordCount: 0 }
+          }
+        }
+      ]);
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query,
+        sendMessage: vi.fn(),
+        create,
+        remove,
+        onUpdated: { addListener, removeListener }
+      },
+      scripting: { executeScript }
+    });
+
+    render(<App />);
+
+    await screen.findByText("采集当前页");
+    fireEvent.click(screen.getByText("采集当前页"));
+
+    await waitFor(() => {
+      expect(projectRecords).toEqual([
+        expect.objectContaining({
+          id: "P0001",
+          status: "failed",
+          error: "详情页未识别到摘要或关键词"
+        })
+      ]);
+    });
+    expect(await screen.findByText("已采集 1 篇，已补摘要 0 篇，未补摘要 1 篇")).toBeTruthy();
+    expect(screen.getAllByText("1 篇")).toHaveLength(2);
+  });
+
+  it("详情页只有关键词没有摘要时不计入已补摘要", async () => {
+    let projectRecords: unknown[] = [];
+    const sendMessage = vi.fn((message: { type: string; records?: unknown[] }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: projectRecords,
+            failures: []
+          }
+        });
+      }
+      if (message.type === "SAVE_RECORDS") {
+        projectRecords = message.records ?? [];
+        callback({
+          ok: true,
+          count: projectRecords.length,
+          project: {
+            records: projectRecords,
+            failures: []
+          }
+        });
+      }
+    });
+    const query = vi.fn((_options, callback) => callback([{ id: 7 }]));
+    const create = vi.fn((_options, callback) => callback({ id: 88, status: "complete" }));
+    const remove = vi.fn((_tabId, callback) => callback?.());
+    const executeScript = vi.fn()
+      .mockResolvedValueOnce([
+        {
+          result: {
+            records: [listOnlyRecord],
+            diagnostics: {
+              url: "https://kns.cnki.net/",
+              title: "知网检索页",
+              tables: 1,
+              resultTables: 1,
+              titleLinks: 1,
+              textSample: "论文列表"
+            }
+          }
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          result: {
+            detail: {
+              title: "党建引领基层治理的实践路径研究",
+              authors: [],
+              abstract: "",
+              keywords: ["基层治理", "党建引领"]
+            },
+            diagnostics: { title: "详情页", abstractLength: 0, keywordCount: 2 }
+          }
+        }
+      ]);
+
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query,
+        sendMessage: vi.fn(),
+        create,
+        remove,
+        onUpdated: { addListener: vi.fn(), removeListener: vi.fn() }
+      },
+      scripting: { executeScript }
+    });
+
+    render(<App />);
+
+    await screen.findByText("采集当前页");
+    fireEvent.click(screen.getByText("采集当前页"));
+
+    await waitFor(() => {
+      expect(projectRecords).toEqual([
+        expect.objectContaining({
+          id: "P0001",
+          abstract: "",
+          keywords: ["基层治理", "党建引领"],
+          status: "partial"
+        })
+      ]);
+    });
+    expect(await screen.findByText("已采集 1 篇，已补摘要 0 篇，未补摘要 1 篇")).toBeTruthy();
   });
 
   it("采集超过 200 篇时只保存前 200 篇", async () => {
@@ -665,5 +912,23 @@ describe("popup", () => {
 
     expect(await screen.findByText("清空当前信息")).toBeTruthy();
     expect(screen.queryByText("清空当前项目")).toBeNull();
+  });
+
+  it("详情页正文快照不作为摘要", () => {
+    document.body.innerHTML = `
+      <h1 class="title">“党建+网格+大数据”为啥管用好用</h1>
+      <div class="authors"><a>王大庆</a><a>冯芸</a></div>
+      <div id="ChDivSummary">
+        <strong>正文快照：</strong>
+        全省4.6万个村党组织成为促振兴、保平安的桥头堡。
+      </div>
+      <p><strong>报纸日期：</strong>2026-05-16</p>
+      <p><strong>专辑：</strong>社会科学Ⅰ辑</p>
+      <p><strong>专题：</strong>中国共产党</p>`;
+
+    const result = extractCnkiDetailFromFrame();
+
+    expect(result.detail.abstract).toBe("");
+    expect(result.diagnostics.abstractLength).toBe(0);
   });
 });
