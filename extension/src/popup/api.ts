@@ -33,8 +33,10 @@ async function readError(response: Response) {
   try {
     const body = await response.json() as ApiErrorBody;
     const error = body.error ?? body.message ?? `HTTP_${response.status}`;
-    if (error === "INVALID_REQUEST") return "邮箱格式不正确或密码少于 8 位";
+    if (error === "INVALID_REQUEST") return "邮箱格式不正确、密码少于 8 位，或验证码格式不正确";
     if (error === "EMAIL_ALREADY_REGISTERED") return "该邮箱已注册，请直接登录";
+    if (error === "INVALID_VERIFICATION_CODE") return "验证码不正确或已过期，请重新获取";
+    if (error === "EMAIL_SENDER_NOT_CONFIGURED") return "服务器还没有配置邮件发送服务";
     if (error === "INVALID_CREDENTIALS") return "邮箱或密码不正确";
     if (error === "UNAUTHORIZED") return "登录已失效，请重新登录";
     if (error === "QUICK_REVIEW_QUOTA_EXHAUSTED") return "快速综述次数已用完";
@@ -63,10 +65,17 @@ async function requestJson<T>(
   return response.json() as Promise<T>;
 }
 
-export function register(email: string, password: string) {
+export function sendVerificationCode(email: string) {
+  return requestJson<{ ok: true }>("/auth/verification-code", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  });
+}
+
+export function register(email: string, password: string, verificationCode: string) {
   return requestJson<AuthSession>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, verificationCode })
   });
 }
 

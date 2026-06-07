@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { generateDeepReview, generateQuickReview, login, register, type AuthSession } from "./api";
+﻿import { useEffect, useRef, useState } from "react";
+import { generateDeepReview, generateQuickReview, login, register, sendVerificationCode, type AuthSession } from "./api";
 import { matchFullTextToRecord } from "../fulltext/fullText";
 import { cleanAbstract, isUsableAbstract } from "../shared/abstract";
 import { DEEP_REVIEW_MAX_PAPERS, QUICK_REVIEW_MAX_PAPERS } from "../shared/reviewLimits";
@@ -56,6 +56,7 @@ type CollectionResult = {
 
 const AUTH_STORAGE_KEY = "cnkiReviewAuth";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type AuthMode = "login" | "register";
 
 function sendRuntimeMessage<T>(message: object): Promise<RuntimeResponse<T>> {
   return new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
@@ -303,8 +304,11 @@ export function App() {
   const [project, setProject] = useState<ProjectSnapshot>({ records: [], failures: [] });
   const [status, setStatus] = useState("等待采集");
   const [auth, setAuth] = useState<AuthSession | null>(() => loadAuthSession());
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isSendingVerificationCode, setIsSendingVerificationCode] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isCollectingRef = useRef(false);
@@ -341,18 +345,52 @@ export function App() {
       setStatus("密码至少需要 8 位");
       return;
     }
+    if (mode === "register" && !/^\d{6}$/.test(verificationCode.trim())) {
+      setStatus("请填写邮件中的 6 位验证码");
+      return;
+    }
 
     try {
       setStatus(mode === "login" ? "正在登录" : "正在注册");
       const session = mode === "login"
         ? await login(normalizedEmail, password)
-        : await register(normalizedEmail, password);
+        : await register(normalizedEmail, password, verificationCode.trim());
       setAuth(session);
       saveAuthSession(session);
+      setVerificationCode("");
       setStatus(mode === "login" ? "登录成功" : "注册成功");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "账号操作失败");
     }
+  }
+
+  async function handleSendVerificationCode() {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setStatus("请先填写邮箱");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setStatus("邮箱格式不正确，请填写完整邮箱");
+      return;
+    }
+
+    setIsSendingVerificationCode(true);
+    try {
+      setStatus("正在发送验证码");
+      await sendVerificationCode(normalizedEmail);
+      setStatus("验证码已发送，请查看邮箱");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "验证码发送失败");
+    } finally {
+      setIsSendingVerificationCode(false);
+    }
+  }
+
+  function switchAuthMode(mode: AuthMode) {
+    setAuthMode(mode);
+    setVerificationCode("");
+    setStatus(mode === "login" ? "请登录账号" : "请注册账号");
   }
 
   function handleLogout() {
@@ -360,6 +398,7 @@ export function App() {
     saveAuthSession(null);
     setEmail("");
     setPassword("");
+    setVerificationCode("");
     setStatus("已退出登录");
   }
 
@@ -725,18 +764,43 @@ export function App() {
             <button type="button" className="secondary" onClick={handleLogout}>退出</button>
           </div>
         ) : (
-          <div className="auth-form">
-            <label>
+          <div className={`auth-form ${authMode === "register" ? "register-mode" : "login-mode"}`}>
+            <label className="email-field">
               邮箱
               <input value={email} onChange={(event) => setEmail(event.target.value)} />
             </label>
+            {authMode === "register" ? (
+              <button
+                type="button"
+                className="secondary verification-button"
+                onClick={handleSendVerificationCode}
+                disabled={isSendingVerificationCode}
+              >
+                获取验证码
+              </button>
+            ) : null}
             <label>
               密码
               <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
             </label>
-            <div className="inline-actions">
-              <button type="button" onClick={() => handleAuth("login")}>登录</button>
-              <button type="button" className="secondary" onClick={() => handleAuth("register")}>注册</button>
+            {authMode === "register" ? (
+              <label>
+                验证码
+                <input value={verificationCode} maxLength={6} onChange={(event) => setVerificationCode(event.target.value)} />
+              </label>
+            ) : null}
+            <button type="button" className="auth-submit" onClick={() => handleAuth(authMode)}>
+              {authMode === "login" ? "登录" : "注册"}
+            </button>
+            <div className="auth-switch-row">
+              <span>{authMode === "login" ? "还没有账号？" : "已有账号？"}</span>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => switchAuthMode(authMode === "login" ? "register" : "login")}
+              >
+                {authMode === "login" ? "去注册" : "去登录"}
+              </button>
             </div>
           </div>
         )}

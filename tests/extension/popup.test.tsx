@@ -279,6 +279,10 @@ describe("popup", () => {
 
     render(<App />);
 
+    expect(screen.queryByLabelText("验证码")).toBeNull();
+    expect(screen.queryByText("获取验证码")).toBeNull();
+    fireEvent.click(screen.getByText("去注册"));
+
     fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "xiao930822@163" } });
     fireEvent.change(screen.getByLabelText("密码"), { target: { value: "password123" } });
     fireEvent.click(screen.getByText("注册"));
@@ -312,12 +316,83 @@ describe("popup", () => {
 
     render(<App />);
 
+    fireEvent.click(screen.getByText("去注册"));
     fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "student@example.com" } });
     fireEvent.change(screen.getByLabelText("密码"), { target: { value: "123456" } });
     fireEvent.click(screen.getByText("注册"));
 
     expect(await screen.findByText("密码至少需要 8 位")).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("注册时先发送验证码并带验证码提交", async () => {
+    const sendMessage = vi.fn((message: { type: string }, callback: (response: unknown) => void) => {
+      if (message.type === "GET_PROJECT") {
+        callback({
+          ok: true,
+          project: {
+            records: [],
+            failures: []
+          }
+        });
+      }
+    });
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        token: "test-token",
+        user: {
+          id: "u1",
+          email: "student@example.com",
+          quickReviewQuota: 3,
+          deepReviewQuota: 1
+        }
+      }), { status: 201, headers: { "content-type": "application/json" } }));
+
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage },
+      tabs: {
+        query: vi.fn(),
+        sendMessage: vi.fn()
+      }
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByText("去注册"));
+    fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: "student@example.com" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "password123" } });
+    fireEvent.click(screen.getByText("获取验证码"));
+    expect(await screen.findByText("验证码已发送，请查看邮箱")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("验证码"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByText("注册"));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining("/auth/verification-code"),
+        expect.objectContaining({
+          body: JSON.stringify({ email: "student@example.com" })
+        })
+      );
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("/auth/register"),
+        expect.objectContaining({
+          body: JSON.stringify({
+            email: "student@example.com",
+            password: "password123",
+            verificationCode: "123456"
+          })
+        })
+      );
+    });
+    expect(await screen.findByText("student@example.com")).toBeTruthy();
   });
 
   it("导入全文后生成深度综述并启用报告下载", async () => {
