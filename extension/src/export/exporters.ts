@@ -123,8 +123,7 @@ export function buildFullTextIndex(records: CnkiRecord[]) {
       `- ${record.id}｜${record.title}`,
       `  - 作者：${record.authors.join("；")}`,
       `  - 来源：${record.source}`,
-      `  - PDF：${record.fullTextFileName ?? ""}`,
-      `  - 匹配分数：${record.fullTextMatchScore?.toFixed(2) ?? ""}`
+      `  - PDF：${record.fullTextFileName ?? ""}`
     ].join("\n"))
   ].join("\n");
 }

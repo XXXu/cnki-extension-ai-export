@@ -1,5 +1,5 @@
 export type CollectionStatus = "list-only" | "partial" | "complete" | "failed";
-export type FullTextStatus = "none" | "matched" | "unmatched" | "failed";
+export type FullTextStatus = "none" | "matched" | "imported" | "unmatched" | "failed";
 
 export type CnkiRecord = {
   id: string;

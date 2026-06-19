@@ -1,39 +1,102 @@
 :root {
   color: #20242a;
-  background: #f6f7f9;
+  background: #f3f6fa;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+html,
 body {
   margin: 0;
+  min-height: 0;
+  height: fit-content;
+  overflow: hidden;
+}
+
+body {
   width: 380px;
   box-sizing: border-box;
 }
 
+#root {
+  display: block;
+  width: 380px;
+  height: fit-content;
+}
+
 .popup-shell {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 7px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.auth-view-shell {
+  align-content: start;
+  gap: 10px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
 }
 
 h1 {
   margin: 0;
   font-size: 17px;
+  letter-spacing: 0;
 }
 
 p {
   margin: 3px 0 0;
-  color: #596273;
+  color: #58657a;
   line-height: 1.35;
   font-size: 12px;
 }
 
-.stats-grid > div,
-.auth-panel,
-.compact-actions {
-  border: 1px solid #d9dee7;
-  border-radius: 7px;
-  background: #ffffff;
+.account-state {
+  flex: 0 0 auto;
+  border: 1px solid #d6e2ef;
+  border-radius: 999px;
+  background: #fff7e8;
+  color: #8a5b00;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 9px;
+}
+
+.account-state.logged-in {
+  background: #eaf8ef;
+  border-color: #bde4cb;
+  color: #217a45;
+}
+
+.account-actions {
+  display: flex;
+  flex: 0 1 190px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.account-email {
+  min-width: 0;
+  max-width: 138px;
+  overflow: hidden;
+  color: #27313f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-logout {
+  min-height: 28px;
+  padding: 0 9px;
 }
 
 .stats-grid {
@@ -42,69 +105,78 @@ p {
   gap: 6px;
 }
 
+.stats-grid > div,
+.workflow-card {
+  border: 1px solid #d9e1ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .stats-grid > div {
   display: grid;
   gap: 2px;
-  padding: 7px 8px;
   min-width: 0;
+  padding: 7px 8px;
   box-sizing: border-box;
 }
 
-.stats-grid span {
-  color: #657084;
+.stats-grid span,
+.panel-heading,
+.workflow-copy span {
+  color: #66758a;
   font-size: 12px;
+}
+
+.stats-grid span {
   white-space: nowrap;
 }
 
-.auth-panel {
+.stats-grid strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.panel {
   padding: 8px;
 }
 
-.auth-form {
-  display: grid;
-  gap: 6px;
-  align-items: end;
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
 }
 
-.auth-form.login-mode {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+.panel-heading span {
+  font-weight: 700;
+  color: #27313f;
 }
 
-.auth-form.register-mode {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-}
-
-.auth-form.register-mode .email-field {
-  grid-column: 1 / 3;
-}
-
-.auth-form label {
-  display: grid;
-  gap: 3px;
-  color: #657084;
+.panel-heading strong {
+  color: #285f8f;
   font-size: 12px;
 }
 
 input {
-  min-height: 30px;
+  min-height: 31px;
   min-width: 0;
   box-sizing: border-box;
-  border: 1px solid #ccd4df;
-  border-radius: 6px;
+  border: 1px solid #cdd7e4;
+  border-radius: 7px;
   padding: 0 8px;
+  background: #fbfcfe;
   color: #20242a;
+  outline: none;
 }
 
-.account-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) 0.65fr 0.65fr auto;
-  gap: 6px;
-  align-items: end;
+input:focus {
+  border-color: #285f8f;
+  box-shadow: 0 0 0 2px rgba(40, 95, 143, 0.14);
 }
 
 .auth-submit,
 .verification-button {
-  min-height: 30px;
+  min-height: 31px;
   padding: 0 10px;
 }
 
@@ -113,9 +185,71 @@ input {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
-  color: #657084;
+  gap: 5px;
+  color: #66758a;
   font-size: 12px;
+}
+
+.auth-switch-row.center {
+  justify-content: center;
+}
+
+.auth-view-header {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.auth-view-header .ghost-button {
+  justify-self: start;
+}
+
+.header-spacer {
+  display: none;
+}
+
+.ghost-button {
+  min-height: 28px;
+  border: 1px solid #c8d9ea;
+  background: #ffffff;
+  color: #285f8f;
+}
+
+.auth-screen-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.auth-screen-panel label,
+.email-code-row label {
+  display: grid;
+  gap: 5px;
+  color: #66758a;
+  font-size: 12px;
+}
+
+.email-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 8px;
+  align-items: end;
+}
+
+.auth-screen-panel .auth-submit {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+.auth-status {
+  margin: -2px 0 0;
+  color: #58657a;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .text-button {
@@ -126,48 +260,56 @@ input {
   font-size: 12px;
 }
 
-.account-row span {
-  display: block;
-  color: #657084;
-  font-size: 12px;
-  white-space: nowrap;
+.workflow-panel {
+  display: grid;
+  gap: 6px;
+  padding: 0;
 }
 
-.account-row strong {
-  display: block;
-  margin-top: 2px;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.workflow-panel .panel-heading {
+  margin: 0 1px;
 }
 
-.account-row button {
-  min-height: 30px;
-  padding: 0 10px;
-}
-
-.compact-actions {
+.workflow-card {
   display: grid;
   gap: 6px;
   padding: 8px;
 }
 
-.action-row {
+.collect-card {
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  background: #fdfefe;
+}
+
+.workflow-copy {
   display: grid;
-  grid-template-columns: 36px 1fr 1fr;
-  gap: 6px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workflow-copy strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.workflow-grid,
+.button-stack {
+  display: grid;
+  gap: 5px;
+}
+
+.review-card {
+  grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
 }
 
-.action-row.deep-row {
-  grid-template-columns: 36px repeat(3, minmax(0, 1fr));
+.review-card .button-stack {
+  grid-template-columns: minmax(0, 1fr) 82px;
 }
 
-.action-row > span {
-  color: #657084;
-  font-size: 12px;
-  font-weight: 700;
+.review-card:nth-child(2) .button-stack {
+  grid-template-columns: 72px minmax(0, 1fr) 78px;
 }
 
 .footer-actions {
@@ -175,23 +317,27 @@ input {
 }
 
 button {
-  min-height: 32px;
+  min-height: 30px;
   min-width: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: #285f8f;
   color: #ffffff;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 button.secondary {
-  background: #e8edf3;
-  color: #27313f;
+  background: #e7edf4;
+  color: #2f3b4c;
+}
+
+button.text-button {
+  font-weight: 700;
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.48;
 }

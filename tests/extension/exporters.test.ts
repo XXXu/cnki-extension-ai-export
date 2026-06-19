@@ -68,8 +68,7 @@ describe("AI export builders", () => {
       ...record,
       fullText: "引言部分。".repeat(200),
       fullTextFileName: "关系产权视域下党建引领村集体经济组织治理研究.pdf",
-      fullTextMatchScore: 0.95,
-      fullTextStatus: "matched" as const
+      fullTextStatus: "imported" as const
     };
 
     const batches = buildFullTextEnhancedBatches([recordWithFullText], 1000);
